@@ -102,8 +102,11 @@ app.options('*', (req, res) => {
 // Root route for Railway health checks - define EARLY for immediate response
 // This MUST respond quickly - Railway uses this for health checks
 // Use plain text for fastest response (no JSON parsing needed)
+// CRITICAL: Respond immediately, no async operations
 app.get('/', (req, res) => {
-  res.status(200).send('OK');
+  // Respond immediately - Railway expects fast response
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('OK');
 });
 
 // Routes
