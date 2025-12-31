@@ -118,9 +118,10 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Start server first (don't wait for MongoDB)
-app.listen(PORT, () => {
+// Start server immediately - Railway will check health on this port
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Health check available at http://0.0.0.0:${PORT}/`);
   
   // Connect to MongoDB after server starts (non-blocking)
   mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/amma-chethi-vanta', {
@@ -131,6 +132,15 @@ app.listen(PORT, () => {
   .catch(err => {
     console.error('MongoDB connection error:', err);
     // Don't crash - server can run without DB for health checks
+  });
+});
+
+// Keep process alive
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
   });
 });
 
