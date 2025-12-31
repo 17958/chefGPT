@@ -8,6 +8,7 @@ const app = express();
 // Handle ALL OPTIONS requests FIRST - before any other middleware
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
+    console.log('OPTIONS request received:', req.url, 'Origin:', req.headers.origin);
     const origin = req.headers.origin;
     const allowedOrigins = [
       'http://localhost:3000',
@@ -21,12 +22,35 @@ app.use((req, res, next) => {
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
       res.header('Access-Control-Allow-Credentials', 'true');
       res.header('Access-Control-Max-Age', '86400'); // 24 hours
+      console.log('OPTIONS request allowed, sending 200');
       return res.sendStatus(200);
     } else {
+      console.log('OPTIONS request denied, sending 403');
       return res.sendStatus(403);
     }
   }
   next();
+});
+
+// Explicit OPTIONS handler for /api/* routes
+app.options('/api/*', (req, res) => {
+  console.log('Explicit OPTIONS handler for /api/*:', req.url);
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    process.env.FRONTEND_URL
+  ].filter(Boolean);
+  
+  if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    return res.sendStatus(200);
+  } else {
+    return res.sendStatus(403);
+  }
 });
 
 // CORS Configuration
