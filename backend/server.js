@@ -30,10 +30,7 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Middleware - CORS must be before routes
-app.use(cors(corsOptions));
-
-// Handle preflight requests explicitly for all routes
+// Handle OPTIONS requests FIRST, before any other middleware
 app.options('*', (req, res) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
@@ -53,7 +50,29 @@ app.options('*', (req, res) => {
   }
 });
 
+// Middleware - CORS must be before routes
+app.use(cors(corsOptions));
+
 app.use(express.json());
+
+// Explicit OPTIONS handler for /api/* routes before mounting
+app.options('/api/*', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    process.env.FRONTEND_URL
+  ].filter(Boolean);
+  
+  if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(403);
+  }
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
