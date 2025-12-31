@@ -64,6 +64,11 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 
+// Root route for Railway health checks - define EARLY for immediate response
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'ChefGPT Backend API', version: '1.0.0' });
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/menu', require('./routes/menu'));
@@ -78,12 +83,6 @@ console.log('  GET /api/menu');
 console.log('  POST/GET /api/orders');
 console.log('  GET/POST/DELETE /api/cart');
 console.log('  POST /api/payments/*');
-
-// Root route for Railway health checks (must be fast!)
-app.get('/', (req, res) => {
-  console.log('[HEALTH CHECK] Root route hit');
-  res.status(200).json({ status: 'OK', message: 'ChefGPT Backend API', version: '1.0.0' });
-});
 
 // Health check
 app.get('/api/health', (req, res) => {
