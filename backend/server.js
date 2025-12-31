@@ -26,53 +26,19 @@ const corsOptions = {
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
 };
 
-// Handle OPTIONS requests FIRST, before any other middleware
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    process.env.FRONTEND_URL
-  ].filter(Boolean);
-  
-  // Allow origin if it's in the list, or if FRONTEND_URL is not set (for initial setup)
-  if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.sendStatus(200);
-  } else {
-    res.sendStatus(403);
-  }
-});
-
-// Middleware - CORS must be before routes
+// Apply CORS middleware - this handles OPTIONS automatically
 app.use(cors(corsOptions));
 
-app.use(express.json());
+// Additional explicit OPTIONS handler as fallback
+app.options('*', cors(corsOptions));
 
-// Explicit OPTIONS handler for /api/* routes before mounting
-app.options('/api/*', (req, res) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    process.env.FRONTEND_URL
-  ].filter(Boolean);
-  
-  if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.sendStatus(200);
-  } else {
-    res.sendStatus(403);
-  }
-});
+app.use(express.json());
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
