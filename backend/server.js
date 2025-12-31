@@ -6,51 +6,40 @@ require('dotenv').config();
 const app = express();
 
 // Handle ALL OPTIONS requests FIRST - before any other middleware
+// This MUST be the first middleware to catch all OPTIONS requests
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
-    console.log('OPTIONS request received:', req.url, 'Origin:', req.headers.origin);
+    console.log('[OPTIONS HANDLER] Request received:', req.method, req.url);
+    console.log('[OPTIONS HANDLER] Origin:', req.headers.origin);
+    console.log('[OPTIONS HANDLER] Headers:', JSON.stringify(req.headers));
+    
     const origin = req.headers.origin;
     const allowedOrigins = [
       'http://localhost:3000',
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
+    console.log('[OPTIONS HANDLER] Allowed origins:', allowedOrigins);
+    console.log('[OPTIONS HANDLER] FRONTEND_URL:', process.env.FRONTEND_URL);
+    console.log('[OPTIONS HANDLER] NODE_ENV:', process.env.NODE_ENV);
+    
     // Allow origin if it's in the list, or if FRONTEND_URL is not set (for initial setup)
-    if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    const shouldAllow = !process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production';
+    
+    if (shouldAllow) {
       res.header('Access-Control-Allow-Origin', origin || '*');
       res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
       res.header('Access-Control-Allow-Credentials', 'true');
       res.header('Access-Control-Max-Age', '86400'); // 24 hours
-      console.log('OPTIONS request allowed, sending 200');
+      console.log('[OPTIONS HANDLER] Allowing request, sending 200');
       return res.sendStatus(200);
     } else {
-      console.log('OPTIONS request denied, sending 403');
+      console.log('[OPTIONS HANDLER] Denying request, sending 403');
       return res.sendStatus(403);
     }
   }
   next();
-});
-
-// Explicit OPTIONS handler for /api/* routes
-app.options('/api/*', (req, res) => {
-  console.log('Explicit OPTIONS handler for /api/*:', req.url);
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    process.env.FRONTEND_URL
-  ].filter(Boolean);
-  
-  if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    return res.sendStatus(200);
-  } else {
-    return res.sendStatus(403);
-  }
 });
 
 // CORS Configuration
@@ -103,6 +92,18 @@ console.log('  POST /api/payments/*');
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
+});
+
+// Catch-all for unmatched routes (for debugging)
+app.use((req, res, next) => {
+  console.log('[404 HANDLER] Unmatched route:', req.method, req.url);
+  console.log('[404 HANDLER] Headers:', JSON.stringify(req.headers));
+  res.status(404).json({ 
+    error: 'Not Found', 
+    method: req.method, 
+    path: req.url,
+    message: 'Route not found. Check server logs for details.'
+  });
 });
 
 // Connect to MongoDB
