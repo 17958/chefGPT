@@ -41,7 +41,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS Configuration
+// CORS Configuration - but let our custom OPTIONS handler handle preflight
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -64,14 +64,40 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  preflightContinue: false,
+  preflightContinue: false, // Don't continue to next middleware for OPTIONS
   optionsSuccessStatus: 200
 };
 
-// Apply CORS middleware for non-OPTIONS requests
+// Apply CORS middleware - but it won't handle OPTIONS because preflightContinue is false
+// Our custom handler above already handled OPTIONS
 app.use(cors(corsOptions));
 
 app.use(express.json());
+
+// Explicit OPTIONS handler for ALL routes - must be before route definitions
+app.options('*', (req, res) => {
+  console.log(`[OPTIONS BACKUP] Caught OPTIONS for: ${req.url}`);
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    process.env.FRONTEND_URL
+  ].filter(Boolean);
+  
+  const shouldAllow = !process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production';
+  
+  if (shouldAllow) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    console.log(`[OPTIONS BACKUP] Sending 200 OK for ${req.url}`);
+    return res.sendStatus(200);
+  } else {
+    console.log(`[OPTIONS BACKUP] Sending 403 Forbidden for ${req.url}`);
+    return res.sendStatus(403);
+  }
+});
 
 // Root route for Railway health checks - define EARLY for immediate response
 app.get('/', (req, res) => {
@@ -101,17 +127,6 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
-});
-
-// Explicit OPTIONS handler for all API routes
-app.options('/api/auth/auth', (req, res) => {
-  const origin = req.headers.origin;
-  res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400');
-  return res.sendStatus(200);
 });
 
 // Catch-all for unmatched routes (for debugging)
