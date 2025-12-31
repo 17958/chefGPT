@@ -79,9 +79,19 @@ console.log('  POST/GET /api/orders');
 console.log('  GET/POST/DELETE /api/cart');
 console.log('  POST /api/payments/*');
 
+// Root route for Railway health checks
+app.get('/', (req, res) => {
+  res.json({ status: 'OK', message: 'ChefGPT Backend API', version: '1.0.0' });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+  res.json({ 
+    status: 'OK', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
 // Explicit OPTIONS handler for all API routes
