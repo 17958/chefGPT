@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 
 /**
- * Send email notification for new order
+ * Send email notification for new order.
  * Uses free SMTP services (Gmail, Outlook, etc.)
  */
 async function sendEmailNotification(order) {
