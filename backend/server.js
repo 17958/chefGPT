@@ -8,15 +8,22 @@ const app = express();
 // Handle ALL OPTIONS requests FIRST - before any other middleware
 // This MUST be the first middleware to catch all OPTIONS requests
 app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.url} - Origin: ${req.headers.origin || 'none'}`);
+  
   if (req.method === 'OPTIONS') {
+    console.log(`[OPTIONS HANDLER] Caught OPTIONS request for: ${req.url}`);
     const origin = req.headers.origin;
     const allowedOrigins = [
       'http://localhost:3000',
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
+    console.log(`[OPTIONS HANDLER] Origin: ${origin}, Allowed: ${allowedOrigins.join(', ')}`);
+    
     // Allow origin if it's in the list, or if FRONTEND_URL is not set (for initial setup)
     const shouldAllow = !process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production';
+    
+    console.log(`[OPTIONS HANDLER] Should allow: ${shouldAllow}`);
     
     if (shouldAllow) {
       res.header('Access-Control-Allow-Origin', origin || '*');
@@ -24,8 +31,10 @@ app.use((req, res, next) => {
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
       res.header('Access-Control-Allow-Credentials', 'true');
       res.header('Access-Control-Max-Age', '86400'); // 24 hours
+      console.log(`[OPTIONS HANDLER] Sending 200 OK for ${req.url}`);
       return res.sendStatus(200);
     } else {
+      console.log(`[OPTIONS HANDLER] Sending 403 Forbidden for ${req.url}`);
       return res.sendStatus(403);
     }
   }
@@ -119,17 +128,19 @@ const PORT = process.env.PORT || 5000;
 
 // Start server immediately - Railway will check health on this port
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Health check available at http://0.0.0.0:${PORT}/`);
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`✅ Health check available at http://0.0.0.0:${PORT}/`);
+  console.log(`✅ Server is ready to accept requests`);
   
   // Connect to MongoDB after server starts (non-blocking)
+  // Don't wait for MongoDB - server can respond to health checks immediately
   mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/amma-chethi-vanta', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log('MongoDB Connected'))
+  .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => {
-    console.error('MongoDB connection error:', err);
+    console.error('⚠️ MongoDB connection error:', err);
     // Don't crash - server can run without DB for health checks
   });
 });
