@@ -5,6 +5,30 @@ require('dotenv').config();
 
 const app = express();
 
+// Handle ALL OPTIONS requests FIRST - before any other middleware
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    // Allow origin if it's in the list, or if FRONTEND_URL is not set (for initial setup)
+    if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Max-Age', '86400'); // 24 hours
+      return res.sendStatus(200);
+    } else {
+      return res.sendStatus(403);
+    }
+  }
+  next();
+});
+
 // CORS Configuration
 const corsOptions = {
   origin: function (origin, callback) {
@@ -32,11 +56,8 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-// Apply CORS middleware - this handles OPTIONS automatically
+// Apply CORS middleware for non-OPTIONS requests
 app.use(cors(corsOptions));
-
-// Additional explicit OPTIONS handler as fallback
-app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
