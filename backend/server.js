@@ -16,7 +16,10 @@ const corsOptions = {
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    // If FRONTEND_URL is not set, allow all origins (for initial setup)
+    // In development mode, allow all origins
+    // In production with FRONTEND_URL set, only allow specific origins
+    if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

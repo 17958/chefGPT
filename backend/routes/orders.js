@@ -20,7 +20,7 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Please select order type (take-away or dine-in)' });
     }
 
-    // Create order first (payment will be verified via Razorpay)
+    // Create order first (payment will be verified via UPI QR code)
     // Order is created with paymentStatus: 'pending'
 
     // Calculate total and validate items

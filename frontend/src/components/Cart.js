@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import UPIQRCode from './UPIQRCode';
 import './Cart.css';
 
 const Cart = ({ cart, onUpdateQuantity, onRemoveItem, onClose, totalAmount }) => {
@@ -8,6 +9,8 @@ const Cart = ({ cart, onUpdateQuantity, onRemoveItem, onClose, totalAmount }) =>
   const [message, setMessage] = useState('');
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrInfo, setQrInfo] = useState(null);
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   
@@ -35,85 +38,58 @@ const Cart = ({ cart, onUpdateQuantity, onRemoveItem, onClose, totalAmount }) =>
       const orderResponse = await axios.post(`${API_URL}/api/orders`, orderData);
       const order = orderResponse.data;
 
-      // Create Razorpay payment order
-      const paymentResponse = await axios.post(
-        `${API_URL}/api/payments/create-order`,
+      // Get QR code payment info
+      const qrResponse = await axios.post(
+        `${API_URL}/api/payments/qr-info`,
         {
           amount: totalAmount,
           orderId: order._id
         }
       );
 
-      const paymentData = paymentResponse.data;
-
-      // Load Razorpay script
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => {
-        const options = {
-          key: paymentData.key,
-          amount: paymentData.amount,
-          currency: paymentData.currency,
-          name: MERCHANT_NAME,
-          description: `Order #${order._id.slice(-6).toUpperCase()}`,
-          order_id: paymentData.id,
-          handler: async function (response) {
-            // Payment successful
-            try {
-              // Verify payment
-              await axios.post(`${API_URL}/api/payments/verify-manual`, {
-                paymentId: response.razorpay_payment_id,
-                orderId: order._id
-              });
-
-              setOrderDetails(order);
-              setOrderPlaced(true);
-              
-              // Clear cart
-              try {
-                await axios.delete(`${API_URL}/api/cart`);
-              } catch (error) {
-                console.error('Error clearing cart:', error);
-              }
-              
-              cart.forEach(item => onRemoveItem(item.menuItemId));
-              
-              setTimeout(() => {
-                setOrderPlaced(false);
-                onClose();
-              }, 3000);
-            } catch (error) {
-              console.error('Payment verification error:', error);
-              setMessage('Payment successful but verification failed. Please contact support.');
-            }
-          },
-          prefill: {
-            contact: '',
-            email: ''
-          },
-          theme: {
-            color: '#1a73e8'
-          },
-          modal: {
-            ondismiss: function() {
-              setLoading(false);
-              setMessage('Payment cancelled');
-            }
-          }
-        };
-
-        const razorpay = new window.Razorpay(options);
-        razorpay.open();
-        setLoading(false);
-      };
-      script.onerror = () => {
-        setLoading(false);
-        setMessage('Failed to load payment gateway');
-      };
-      document.body.appendChild(script);
+      const qrData = qrResponse.data;
+      setQrInfo(qrData);
+      setOrderDetails(order);
+      setShowQRCode(true);
+      setLoading(false);
     } catch (error) {
       console.error('Order creation error:', error);
       setMessage(error.response?.data?.message || 'Failed to create order. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  const handlePaymentConfirmed = async () => {
+    if (!orderDetails) return;
+
+    setLoading(true);
+    try {
+      // Verify payment (manual confirmation)
+      await axios.post(`${API_URL}/api/payments/verify-manual`, {
+        orderId: orderDetails._id,
+        transactionId: `UPI_${Date.now()}`
+      });
+
+      setOrderPlaced(true);
+      setShowQRCode(false);
+      
+      // Clear cart
+      try {
+        await axios.delete(`${API_URL}/api/cart`);
+      } catch (error) {
+        console.error('Error clearing cart:', error);
+      }
+      
+      cart.forEach(item => onRemoveItem(item.menuItemId));
+      
+      setTimeout(() => {
+        setOrderPlaced(false);
+        onClose();
+      }, 3000);
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      setMessage('Failed to confirm payment. Please contact support.');
+    } finally {
       setLoading(false);
     }
   };
@@ -148,9 +124,56 @@ const Cart = ({ cart, onUpdateQuantity, onRemoveItem, onClose, totalAmount }) =>
                 <div className="order-confirmation-details">
                   <p className="order-id">Order ID: #{orderDetails._id.slice(-6).toUpperCase()}</p>
                   <p className="order-amount">Amount: ₹{orderDetails.totalAmount.toFixed(2)}</p>
-                  <p className="order-message">Payment verified! Your order is confirmed.</p>
+                  <p className="order-message">Payment confirmed! Your order is being prepared.</p>
                 </div>
               )}
+            </div>
+          </>
+        ) : showQRCode && qrInfo ? (
+          <>
+            <div className="cart-scrollable" style={{ textAlign: 'center', padding: '20px' }}>
+              <div style={{ marginBottom: '20px' }}>
+                <h3>Order #{orderDetails?._id.slice(-6).toUpperCase()}</h3>
+                <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#1a73e8' }}>
+                  Amount: ₹{totalAmount.toFixed(2)}
+                </p>
+              </div>
+              <UPIQRCode
+                upiId={qrInfo.upiId}
+                amount={parseFloat(qrInfo.amount)}
+                merchantName={qrInfo.merchantName}
+              />
+              <div style={{ marginTop: '20px' }}>
+                <p style={{ color: '#666', marginBottom: '15px' }}>
+                  Scan the QR code with any UPI app to pay
+                </p>
+                <button
+                  onClick={handlePaymentConfirmed}
+                  className="place-order-btn"
+                  disabled={loading}
+                  style={{ marginTop: '10px' }}
+                >
+                  {loading ? 'Confirming...' : 'I have paid'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowQRCode(false);
+                    setQrInfo(null);
+                    setOrderDetails(null);
+                  }}
+                  style={{
+                    marginTop: '10px',
+                    background: 'transparent',
+                    border: '1px solid #ddd',
+                    color: '#666',
+                    padding: '10px 20px',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel Order
+                </button>
+              </div>
             </div>
           </>
         ) : (
