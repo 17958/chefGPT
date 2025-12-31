@@ -79,9 +79,10 @@ console.log('  POST/GET /api/orders');
 console.log('  GET/POST/DELETE /api/cart');
 console.log('  POST /api/payments/*');
 
-// Root route for Railway health checks
+// Root route for Railway health checks (must be fast!)
 app.get('/', (req, res) => {
-  res.json({ status: 'OK', message: 'ChefGPT Backend API', version: '1.0.0' });
+  console.log('[HEALTH CHECK] Root route hit');
+  res.status(200).json({ status: 'OK', message: 'ChefGPT Backend API', version: '1.0.0' });
 });
 
 // Health check
