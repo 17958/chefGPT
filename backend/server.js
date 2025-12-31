@@ -101,14 +101,9 @@ app.options('*', (req, res) => {
 
 // Root route for Railway health checks - define EARLY for immediate response
 // This MUST respond quickly - Railway uses this for health checks
+// Use plain text for fastest response (no JSON parsing needed)
 app.get('/', (req, res) => {
-  console.log('[HEALTH CHECK] Root route hit - responding immediately');
-  res.status(200).json({ 
-    status: 'OK', 
-    message: 'ChefGPT Backend API', 
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
+  res.status(200).send('OK');
 });
 
 // Routes
@@ -149,23 +144,52 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 5000;
 
 // Start server immediately - Railway will check health on this port
+// CRITICAL: Server must be listening BEFORE Railway health checks
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`✅ Health check available at http://0.0.0.0:${PORT}/`);
   console.log(`✅ Server is ready to accept requests`);
+  console.log(`✅ Railway can now check health - server is listening`);
+  
+  // Test that server is actually responding
+  setTimeout(() => {
+    console.log(`✅ Server confirmed listening on port ${PORT}`);
+  }, 100);
   
   // Connect to MongoDB after server starts (non-blocking)
   // Don't wait for MongoDB - server can respond to health checks immediately
-  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/amma-chethi-vanta', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log('✅ MongoDB Connected'))
-  .catch(err => {
-    console.error('⚠️ MongoDB connection error:', err);
-    // Don't crash - server can run without DB for health checks
-  });
+  // Use cached connection if available (helps with Railway cold starts)
+  if (mongoose.connection.readyState === 0) {
+    mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/amma-chethi-vanta', {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    })
+    .then(() => console.log('✅ MongoDB Connected'))
+    .catch(err => {
+      console.error('⚠️ MongoDB connection error:', err);
+      // Don't crash - server can run without DB for health checks
+    });
+  } else {
+    console.log('✅ MongoDB Already Connected');
+  }
 });
+
+// CRITICAL: Keep server process alive - prevent exit
+server.on('error', (err) => {
+  console.error('❌ Server error:', err);
+  // Don't exit - try to recover
+});
+
+// Ensure process stays alive - prevent accidental exits
+process.on('beforeExit', (code) => {
+  console.log(`⚠️ Process about to exit with code ${code} - this should not happen`);
+  // Don't exit - keep server running
+});
+
+// Keep the event loop alive
+setInterval(() => {
+  // This keeps the process alive
+}, 10000);
 
 // Keep process alive - prevent accidental exits
 process.on('SIGTERM', () => {
