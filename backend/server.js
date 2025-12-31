@@ -100,8 +100,15 @@ app.options('*', (req, res) => {
 });
 
 // Root route for Railway health checks - define EARLY for immediate response
+// This MUST respond quickly - Railway uses this for health checks
 app.get('/', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'ChefGPT Backend API', version: '1.0.0' });
+  console.log('[HEALTH CHECK] Root route hit - responding immediately');
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'ChefGPT Backend API', 
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Routes
@@ -160,12 +167,32 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   });
 });
 
-// Keep process alive
+// Keep process alive - prevent accidental exits
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
+});
+
+// Keep process alive
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+// Prevent uncaught exceptions from crashing the server
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Don't exit - keep server running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit - keep server running
 });
 
