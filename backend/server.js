@@ -109,12 +109,18 @@ app.get('/', (req, res) => {
   res.end('OK');
 });
 
-// Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/menu', require('./routes/menu'));
-app.use('/api/orders', require('./routes/orders'));
-app.use('/api/cart', require('./routes/cart'));
-app.use('/api/payments', require('./routes/payments'));
+// Routes - wrap in try-catch to prevent crashes
+try {
+  app.use('/api/auth', require('./routes/auth'));
+  app.use('/api/menu', require('./routes/menu'));
+  app.use('/api/orders', require('./routes/orders'));
+  app.use('/api/cart', require('./routes/cart'));
+  app.use('/api/payments', require('./routes/payments'));
+  console.log('✅ All routes loaded successfully');
+} catch (error) {
+  console.error('❌ Error loading routes:', error);
+  // Don't crash - server can still respond to health checks
+}
 
 // Debug: Log all registered routes
 console.log('Registered routes:');
@@ -146,42 +152,50 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
+console.log(`🚀 Starting server on port ${PORT}...`);
+
 // Start server immediately - Railway will check health on this port
 // CRITICAL: Server must be listening BEFORE Railway health checks
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`✅ Health check available at http://0.0.0.0:${PORT}/`);
-  console.log(`✅ Server is ready to accept requests`);
-  console.log(`✅ Railway can now check health - server is listening`);
-  
-  // Test that server is actually responding
-  setTimeout(() => {
-    console.log(`✅ Server confirmed listening on port ${PORT}`);
-  }, 100);
-  
-  // Connect to MongoDB after server starts (non-blocking)
-  // Don't wait for MongoDB - server can respond to health checks immediately
-  // Use cached connection if available (helps with Railway cold starts)
-  if (mongoose.connection.readyState === 0) {
-    mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/amma-chethi-vanta', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    })
-    .then(() => console.log('✅ MongoDB Connected'))
-    .catch(err => {
-      console.error('⚠️ MongoDB connection error:', err);
-      // Don't crash - server can run without DB for health checks
-    });
-  } else {
-    console.log('✅ MongoDB Already Connected');
-  }
-});
+let server;
+try {
+  server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`✅ Health check available at http://0.0.0.0:${PORT}/`);
+    console.log(`✅ Server is ready to accept requests`);
+    console.log(`✅ Railway can now check health - server is listening`);
+    
+    // Test that server is actually responding
+    setTimeout(() => {
+      console.log(`✅ Server confirmed listening on port ${PORT}`);
+    }, 100);
+    
+    // Connect to MongoDB after server starts (non-blocking)
+    // Don't wait for MongoDB - server can respond to health checks immediately
+    // Use cached connection if available (helps with Railway cold starts)
+    if (mongoose.connection.readyState === 0) {
+      mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/amma-chethi-vanta', {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      })
+      .then(() => console.log('✅ MongoDB Connected'))
+      .catch(err => {
+        console.error('⚠️ MongoDB connection error:', err);
+        // Don't crash - server can run without DB for health checks
+      });
+    } else {
+      console.log('✅ MongoDB Already Connected');
+    }
+  });
 
-// CRITICAL: Keep server process alive - prevent exit
-server.on('error', (err) => {
-  console.error('❌ Server error:', err);
-  // Don't exit - try to recover
-});
+  // CRITICAL: Keep server process alive - prevent exit
+  server.on('error', (err) => {
+    console.error('❌ Server error:', err);
+    // Don't exit - try to recover
+  });
+} catch (error) {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
+}
 
 // Ensure process stays alive - prevent accidental exits
 process.on('beforeExit', (code) => {
