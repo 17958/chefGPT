@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "ChefGPT Restaurant - Full Stack Application",
   "scripts": {
+    "build": "cd backend && npm install",
     "start": "cd backend && npm start",
     "postinstall": "cd backend && npm install",
     "raju": "concurrently \"npm run backend:dev\" \"npm run frontend:start\"",
