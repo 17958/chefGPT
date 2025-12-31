@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "ChefGPT Restaurant - Full Stack Application",
   "scripts": {
+    "start": "cd backend && npm start",
     "raju": "concurrently \"npm run backend:dev\" \"npm run frontend:start\"",
     "backend:dev": "cd backend && npm run dev",
     "backend:start": "cd backend && npm start",
@@ -10,6 +11,7 @@
     "frontend:build": "cd frontend && npm run build",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },
+  "main": "backend/server.js",
   "devDependencies": {
     "concurrently": "^8.2.2"
   }
