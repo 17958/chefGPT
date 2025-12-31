@@ -1,0 +1,193 @@
+.menu-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+  overflow-x: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.menu-header {
+  background: #ffffff;
+  padding: 20px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo-section {
+  text-align: left;
+}
+
+.restaurant-title {
+  font-size: 1.375rem;
+  color: #202124;
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.restaurant-subtitle {
+  font-size: 0.875rem;
+  color: #5f6368;
+  margin: 4px 0 0 0;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-name {
+  color: #202124;
+  font-weight: 500;
+  font-size: 1rem;
+  font-family: 'Poppins', sans-serif;
+  letter-spacing: 0.25px;
+}
+
+.logout-btn {
+  padding: 8px 16px;
+  background: #ea4335;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.8125rem;
+  letter-spacing: 0.25px;
+}
+
+.logout-btn:hover {
+  background: #c5221f;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.menu-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  position: relative;
+}
+
+.menu-content {
+  margin-bottom: 100px;
+}
+
+.menu-intro {
+  text-align: center;
+  margin-bottom: 50px;
+  padding-top: 20px;
+}
+
+.menu-intro h2 {
+  font-size: 1.75rem;
+  margin-bottom: 8px;
+  color: #202124;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.menu-intro p {
+  font-size: 0.875rem;
+  color: #5f6368;
+  font-weight: 400;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 30px;
+  margin-top: 30px;
+}
+
+.empty-menu {
+  text-align: center;
+  color: #6c757d;
+  padding: 60px 20px;
+  font-size: 1.1rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+
+.cart-toggle {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  z-index: 90;
+}
+
+.cart-button {
+  padding: 14px 24px;
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  font-family: 'Poppins', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.25px;
+}
+
+.cart-button:hover {
+  background: #1765cc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .restaurant-title {
+    font-size: 1.5rem;
+  }
+
+  .restaurant-subtitle {
+    font-size: 1rem;
+  }
+
+  .menu-intro h2 {
+    font-size: 2rem;
+  }
+
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cart-toggle {
+    bottom: 20px;
+    right: 20px;
+  }
+
+  .cart-button {
+    padding: 15px 25px;
+    font-size: 1rem;
+  }
+}
+
