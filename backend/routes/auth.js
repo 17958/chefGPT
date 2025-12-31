@@ -5,6 +5,26 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
+// Handle OPTIONS preflight for all routes in this router
+router.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    process.env.FRONTEND_URL
+  ].filter(Boolean);
+  
+  // Allow origin if it's in the list, or if FRONTEND_URL is not set (for initial setup)
+  if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(403);
+  }
+});
+
 // Unified Auth - Handles both sign in and sign up
 router.post('/auth', async (req, res) => {
   try {
