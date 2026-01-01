@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './AuthPage.css';
 
 const AuthPage = () => {
-  const [isSignIn, setIsSignIn] = useState(true);
+  const location = useLocation();
+  // Determine initial state based on route
+  const getInitialSignInState = () => {
+    if (location.pathname === '/signup') return false;
+    if (location.pathname === '/signin') return true;
+    return true; // default to signin
+  };
+  
+  const [isSignIn, setIsSignIn] = useState(getInitialSignInState());
   // Separate state for signin and signup forms
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
@@ -18,6 +26,15 @@ const AuthPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // Update state when route changes
+  useEffect(() => {
+    if (location.pathname === '/signup') {
+      setIsSignIn(false);
+    } else if (location.pathname === '/signin' || location.pathname === '/auth') {
+      setIsSignIn(true);
+    }
+  }, [location.pathname]);
+
   // Pre-fill email from URL parameter and check DB to decide signin/signup
   useEffect(() => {
     const emailParam = searchParams.get('email');
@@ -26,7 +43,17 @@ const AuthPage = () => {
       const checkEmailStatus = async () => {
         try {
           const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-          const response = await fetch(`${apiUrl}/api/auth/check-email/${encodeURIComponent(emailParam)}`);
+          const response = await fetch(`${apiUrl}/api/auth/check-email/${encodeURIComponent(emailParam)}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
           const data = await response.json();
           
           if (data.shouldSignUp) {
