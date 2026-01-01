@@ -20,7 +20,8 @@ async function getAIResponse(prompt) {
       return "Hey! I'm @bro, your AI assistant. To use me, add GEMINI_API_KEY to your .env file. Get a free API key at https://makersuite.google.com/app/apikey";
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    // Use gemini-1.5-flash (faster, free tier) or gemini-1.5-pro (more capable)
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
     const chatPrompt = `You are @bro, a friendly and helpful AI assistant. 
     Keep responses concise, friendly, and helpful. 

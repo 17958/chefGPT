@@ -4,9 +4,16 @@
 
 const express = require('express');
 const User = require('../models/User');
+const FriendRequest = require('../models/FriendRequest');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
+
+// Store io instance for socket notifications
+let ioInstance = null;
+router.setIO = (io) => {
+  ioInstance = io;
+};
 
 // Handle OPTIONS preflight
 router.options('*', (req, res) => {
@@ -27,7 +34,7 @@ router.options('*', (req, res) => {
   }
 });
 
-// GET /api/friends - Get all friends
+// GET /api/friends - Get all friends and pending requests
 router.get('/', auth, async (req, res) => {
   try {
     console.log('📋 Fetching friends for user:', req.user._id);
@@ -35,11 +42,28 @@ router.get('/', auth, async (req, res) => {
     
     if (!user) {
       console.error('❌ User not found:', req.user._id);
-      return res.status(404).json({ message: 'User not found', friends: [] });
+      return res.status(404).json({ message: 'User not found', friends: [], pendingRequests: [] });
     }
     
+    // Get pending friend requests (sent and received)
+    const sentRequests = await FriendRequest.find({ 
+      from: req.user._id, 
+      status: 'pending' 
+    }).populate('to', 'name email');
+    
+    const receivedRequests = await FriendRequest.find({ 
+      to: req.user._id, 
+      status: 'pending' 
+    }).populate('from', 'name email');
+    
     console.log('✅ Found user with', user.friends?.length || 0, 'friends');
-    res.json({ friends: user.friends || [] });
+    res.json({ 
+      friends: user.friends || [],
+      pendingRequests: {
+        sent: sentRequests.map(r => ({ id: r._id, user: r.to })),
+        received: receivedRequests.map(r => ({ id: r._id, user: r.from }))
+      }
+    });
   } catch (error) {
     console.error('❌ Get friends error:', error);
     console.error('Error details:', {
@@ -47,7 +71,7 @@ router.get('/', auth, async (req, res) => {
       stack: error.stack,
       userId: req.user?._id
     });
-    res.status(500).json({ message: 'Failed to fetch friends', friends: [] });
+    res.status(500).json({ message: 'Failed to fetch friends', friends: [], pendingRequests: [] });
   }
 });
 
@@ -106,17 +130,53 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Already friends with this user' });
     }
 
-    // Add friend
-    user.friends.push(friend._id);
-    await user.save();
-    console.log('✅ Friend added to user list:', friend._id);
+    // Check if there's already a pending request
+    const existingRequest = await FriendRequest.findOne({
+      $or: [
+        { from: req.user._id, to: friend._id, status: 'pending' },
+        { from: friend._id, to: req.user._id, status: 'pending' }
+      ]
+    });
 
-    // Populate and return friends list
-    await user.populate('friends', 'name email');
-    console.log('📋 Returning friends list with', user.friends.length, 'friends');
+    if (existingRequest) {
+      return res.status(400).json({ 
+        message: existingRequest.from.toString() === req.user._id.toString() 
+          ? 'Friend request already sent. Waiting for response.'
+          : 'You already have a pending request from this user. Please accept or reject it.'
+      });
+    }
+
+    // Create friend request instead of directly adding
+    const friendRequest = new FriendRequest({
+      from: req.user._id,
+      to: friend._id,
+      status: 'pending'
+    });
+    await friendRequest.save();
+    await friendRequest.populate('from', 'name email');
+    console.log('✅ Friend request created:', friendRequest._id);
+
+    // Emit socket event to notify the friend (if they're online)
+    if (ioInstance) {
+      // Emit to all sockets, client will filter by userId
+      ioInstance.emit('friendRequest', {
+        type: 'newRequest',
+        to: friend._id.toString(),
+        request: {
+          id: friendRequest._id,
+          from: {
+            id: req.user._id,
+            name: req.user.name || 'Someone',
+            email: req.user.email
+          }
+        }
+      });
+      console.log('📤 Friend request notification sent via socket to:', friend._id);
+    }
+
     res.json({ 
-      message: 'Friend added successfully! You can now chat with them in real-time.',
-      friends: user.friends 
+      message: 'Friend request sent! They will receive a notification to accept or reject.',
+      requestId: friendRequest._id
     });
   } catch (error) {
     console.error('Add friend error:', error);
@@ -173,6 +233,121 @@ router.post('/', auth, async (req, res) => {
       message: error.message || 'Failed to add friend. Please try again.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+});
+
+// POST /api/friends/accept/:requestId - Accept friend request
+router.post('/accept/:requestId', auth, async (req, res) => {
+  try {
+    const requestId = req.params.requestId;
+    const friendRequest = await FriendRequest.findById(requestId)
+      .populate('from', 'name email')
+      .populate('to', 'name email');
+
+    if (!friendRequest) {
+      return res.status(404).json({ message: 'Friend request not found' });
+    }
+
+    // Verify the request is for the current user
+    if (friendRequest.to._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You can only accept requests sent to you' });
+    }
+
+    if (friendRequest.status !== 'pending') {
+      return res.status(400).json({ message: 'This request has already been processed' });
+    }
+
+    // Add each other as friends
+    const fromUser = await User.findById(friendRequest.from._id);
+    const toUser = await User.findById(friendRequest.to._id);
+
+    // Add to each other's friends list
+    if (!fromUser.friends.includes(toUser._id)) {
+      fromUser.friends.push(toUser._id);
+      await fromUser.save();
+    }
+    if (!toUser.friends.includes(fromUser._id)) {
+      toUser.friends.push(fromUser._id);
+      await toUser.save();
+    }
+
+    // Update request status
+    friendRequest.status = 'accepted';
+    await friendRequest.save();
+
+    console.log('✅ Friend request accepted:', requestId);
+
+    // Emit socket event to notify the requester
+    if (ioInstance) {
+      ioInstance.emit('friendRequest', {
+        type: 'accepted',
+        to: fromUser._id.toString(),
+        request: {
+          id: friendRequest._id,
+          from: {
+            id: toUser._id,
+            name: toUser.name || 'Someone',
+            email: toUser.email
+          }
+        }
+      });
+      console.log('📤 Friend request accepted notification sent via socket to:', fromUser._id);
+    }
+
+    // Populate and return updated friends list
+    await toUser.populate('friends', 'name email');
+    res.json({ 
+      message: 'Friend request accepted! You can now chat with them.',
+      friends: toUser.friends 
+    });
+  } catch (error) {
+    console.error('Accept friend request error:', error);
+    res.status(500).json({ message: 'Failed to accept friend request' });
+  }
+});
+
+// POST /api/friends/reject/:requestId - Reject friend request
+router.post('/reject/:requestId', auth, async (req, res) => {
+  try {
+    const requestId = req.params.requestId;
+    const friendRequest = await FriendRequest.findById(requestId);
+
+    if (!friendRequest) {
+      return res.status(404).json({ message: 'Friend request not found' });
+    }
+
+    // Verify the request is for the current user
+    if (friendRequest.to.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You can only reject requests sent to you' });
+    }
+
+    if (friendRequest.status !== 'pending') {
+      return res.status(400).json({ message: 'This request has already been processed' });
+    }
+
+    // Update request status
+    friendRequest.status = 'rejected';
+    await friendRequest.save();
+
+    console.log('✅ Friend request rejected:', requestId);
+
+    // Emit socket event to notify the requester
+    const fromUser = await User.findById(friendRequest.from);
+    if (ioInstance && fromUser) {
+      ioInstance.emit('friendRequest', {
+        type: 'rejected',
+        to: fromUser._id.toString(),
+        request: {
+          id: friendRequest._id
+        }
+      });
+      console.log('📤 Friend request rejected notification sent via socket to:', fromUser._id);
+    }
+
+    res.json({ message: 'Friend request rejected' });
+  } catch (error) {
+    console.error('Reject friend request error:', error);
+    res.status(500).json({ message: 'Failed to reject friend request' });
   }
 });
 

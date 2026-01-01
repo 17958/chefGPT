@@ -282,7 +282,10 @@ try {
   app.use('/api/orders', require('./routes/orders')); // Create and view orders
   app.use('/api/cart', require('./routes/cart')); // Shopping cart
   app.use('/api/payments', require('./routes/payments')); // Payment processing
-  app.use('/api/friends', require('./routes/friends')); // Friends management
+  // Pass io instance to friends route for socket notifications
+  const friendsRouter = require('./routes/friends');
+  friendsRouter.setIO(io); // Set io instance for friend request notifications
+  app.use('/api/friends', friendsRouter); // Friends management
   app.use('/api/messages', require('./routes/messages')); // Get messages
   console.log('✅ All routes loaded successfully');
 } catch (error) {
