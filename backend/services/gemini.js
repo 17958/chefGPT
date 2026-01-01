@@ -21,17 +21,19 @@ async function getAIResponse(prompt) {
     }
 
     // Try different model names in order of preference
+    // Using only stable, available models
     const modelNames = [
-      'gemini-pro',           // Most stable and widely available
-      'gemini-1.0-pro',      // Alternative stable model
-      'gemini-1.5-pro',      // If available
-      'gemini-2.0-flash-exp' // Experimental
+      'gemini-1.5-flash',     // Fast and efficient (recommended)
+      'gemini-1.5-pro',      // More capable model
+      'gemini-pro',          // Stable fallback
+      'gemini-1.0-pro'       // Legacy fallback
     ];
 
     let lastError = null;
     
     for (const modelName of modelNames) {
       try {
+        console.log(`🔄 Attempting to use model: ${modelName}`);
         const model = genAI.getGenerativeModel({ model: modelName });
         
         const chatPrompt = `You are @bro, a friendly and helpful AI assistant. 
@@ -45,17 +47,19 @@ async function getAIResponse(prompt) {
         const text = response.text();
         
         if (text) {
-          console.log(`✅ Using model: ${modelName}`);
+          console.log(`✅ Successfully using model: ${modelName}`);
           return text;
         }
       } catch (error) {
-        console.log(`⚠️ Model ${modelName} failed, trying next...`);
+        console.log(`⚠️ Model ${modelName} failed: ${error.message}`);
         lastError = error;
+        // Continue to next model
         continue;
       }
     }
 
-    // If all models failed, throw the last error
+    // If all models failed, log and throw
+    console.error('❌ All Gemini models failed. Last error:', lastError?.message);
     throw lastError || new Error('All models failed');
   } catch (error) {
     console.error('Gemini AI error:', error);
