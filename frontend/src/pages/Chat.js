@@ -33,12 +33,12 @@ const Chat = () => {
 
   // @bro suggestion prompts
   const broSuggestions = [
-    { text: '@bro', label: 'Ask @bro anything', description: 'Get AI assistance' },
-    { text: '@bro what can you help me with?', label: 'What can you help with?', description: 'Discover @bro capabilities' },
-    { text: '@bro give me cooking tips', label: 'Cooking tips', description: 'Get culinary advice' },
-    { text: '@bro tell me a joke', label: 'Tell me a joke', description: 'Have some fun' },
-    { text: '@bro help me with recipes', label: 'Recipe help', description: 'Get recipe suggestions' },
-    { text: '@bro explain something', label: 'Explain something', description: 'Learn something new' }
+    { text: 'bro', label: '🤖 @bro', description: 'AI Assistant - Ask anything' },
+    { text: 'bro what can you help me with?', label: 'What can you help with?', description: 'Discover @bro capabilities' },
+    { text: 'bro give me cooking tips', label: 'Cooking tips', description: 'Get culinary advice' },
+    { text: 'bro tell me a joke', label: 'Tell me a joke', description: 'Have some fun' },
+    { text: 'bro help me with recipes', label: 'Recipe help', description: 'Get recipe suggestions' },
+    { text: 'bro explain something', label: 'Explain something', description: 'Learn something new' }
   ];
 
   // Persist selected friend to localStorage
@@ -703,18 +703,18 @@ const Chat = () => {
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder={socketStatus === 'connected' ? "Type a message... (Use @bro for AI help)" : "Connecting..."}
+                  placeholder={socketStatus === 'connected' ? "Type a message... (Type @ for AI help)" : "Connecting..."}
                   value={newMessage}
                   onChange={(e) => {
                     const value = e.target.value;
                     setNewMessage(value);
                     
-                    // Show suggestions when typing @bro
-                    const lastAtBro = value.toLowerCase().lastIndexOf('@bro');
-                    if (lastAtBro !== -1) {
-                      const afterAtBro = value.substring(lastAtBro + 4).trim();
-                      // Show suggestions if @bro is at the end or followed by space
-                      if (afterAtBro === '' || afterAtBro.startsWith(' ')) {
+                    // Show suggestions when typing @
+                    const lastAt = value.lastIndexOf('@');
+                    if (lastAt !== -1) {
+                      const afterAt = value.substring(lastAt + 1).trim();
+                      // Show suggestions if @ is at the end or followed by space/start of word
+                      if (afterAt === '' || afterAt.startsWith(' ') || /^[a-zA-Z]*$/.test(afterAt)) {
                         setShowBroSuggestions(true);
                         setSelectedSuggestionIndex(-1);
                       } else {
@@ -740,7 +740,18 @@ const Chat = () => {
                       } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
                         e.preventDefault();
                         const suggestion = broSuggestions[selectedSuggestionIndex];
-                        setNewMessage(suggestion.text);
+                        // Find the last @ and replace the word after it with the suggestion
+                        const lastAt = newMessage.lastIndexOf('@');
+                        if (lastAt !== -1) {
+                          const beforeAt = newMessage.substring(0, lastAt + 1);
+                          const afterAt = newMessage.substring(lastAt + 1);
+                          // Find where the current word ends (space or end of string)
+                          const wordEndMatch = afterAt.match(/^([a-zA-Z]*)(\s|$)/);
+                          const restOfText = wordEndMatch ? afterAt.substring(wordEndMatch[1].length) : '';
+                          setNewMessage(beforeAt + suggestion.text + restOfText);
+                        } else {
+                          setNewMessage('@' + suggestion.text);
+                        }
                         setShowBroSuggestions(false);
                         setSelectedSuggestionIndex(-1);
                         inputRef.current?.focus();
@@ -771,12 +782,12 @@ const Chat = () => {
                     }, 200);
                   }}
                   onClick={() => {
-                    // Show suggestions if input contains @bro
-                    if (newMessage.toLowerCase().includes('@bro')) {
-                      const lastAtBro = newMessage.toLowerCase().lastIndexOf('@bro');
-                      if (lastAtBro !== -1) {
-                        const afterAtBro = newMessage.substring(lastAtBro + 4).trim();
-                        if (afterAtBro === '' || afterAtBro.startsWith(' ')) {
+                    // Show suggestions if input contains @
+                    if (newMessage.includes('@')) {
+                      const lastAt = newMessage.lastIndexOf('@');
+                      if (lastAt !== -1) {
+                        const afterAt = newMessage.substring(lastAt + 1).trim();
+                        if (afterAt === '' || afterAt.startsWith(' ') || /^[a-zA-Z]*$/.test(afterAt)) {
                           setShowBroSuggestions(true);
                         }
                       }
@@ -792,14 +803,25 @@ const Chat = () => {
                   >
                     <div className="bro-suggestions-header">
                       <span className="bro-badge">🤖 @bro</span>
-                      <span className="bro-suggestions-title">AI Assistant</span>
+                      <span className="bro-suggestions-title">AI Assistant Suggestions</span>
                     </div>
                     {broSuggestions.map((suggestion, index) => (
                       <div
                         key={index}
                         className={`bro-suggestion-item ${selectedSuggestionIndex === index ? 'selected' : ''}`}
                         onClick={() => {
-                          setNewMessage(suggestion.text);
+                          // Find the last @ and replace the word after it with the suggestion
+                          const lastAt = newMessage.lastIndexOf('@');
+                          if (lastAt !== -1) {
+                            const beforeAt = newMessage.substring(0, lastAt + 1);
+                            const afterAt = newMessage.substring(lastAt + 1);
+                            // Find where the current word ends (space or end of string)
+                            const wordEndMatch = afterAt.match(/^([a-zA-Z]*)(\s|$)/);
+                            const restOfText = wordEndMatch ? afterAt.substring(wordEndMatch[1].length) : '';
+                            setNewMessage(beforeAt + suggestion.text + restOfText);
+                          } else {
+                            setNewMessage('@' + suggestion.text);
+                          }
                           setShowBroSuggestions(false);
                           setSelectedSuggestionIndex(-1);
                           inputRef.current?.focus();
@@ -831,7 +853,7 @@ const Chat = () => {
             <div className="no-chat-icon">💬</div>
             <h3>Select a friend to start chatting</h3>
             <p>Or add a new friend to begin a conversation</p>
-            <p className="ai-hint">💡 Tip: Use @bro in your messages to get AI assistance!</p>
+            <p className="ai-hint">💡 Tip: Type @ in your messages to get AI assistance suggestions!</p>
           </div>
         )}
       </div>
