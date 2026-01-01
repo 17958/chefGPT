@@ -14,13 +14,143 @@ require('dotenv').config({ path: __dirname + '/.env' });
 // express - helps us create a web server (like building a restaurant)
 // mongoose - helps us talk to MongoDB database (like talking to a storage room)
 // cors - allows frontend to talk to backend (like allowing customers to enter)
+// socket.io - enables real-time chat (like a walkie-talkie for instant messages)
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 
-// Step 3: Create our Express app
+// Step 3: Create our Express app and HTTP server
 // This creates a new web server (like opening a new restaurant)
 const app = express();
+const server = http.createServer(app);
+
+// Step 3.5: Setup Socket.io for real-time chat
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Store connected users
+const connectedUsers = new Map();
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // User joins with their user ID
+  socket.on('join', (userId) => {
+    connectedUsers.set(userId, socket.id);
+    socket.userId = userId;
+    console.log(`User ${userId} joined chat`);
+  });
+
+  // Handle sending messages
+  socket.on('sendMessage', async (data) => {
+    try {
+      const Message = require('./models/Message');
+      const { getAIResponse } = require('./services/gemini');
+      
+      const { senderId, receiverId, content } = data;
+
+      // Check if message mentions @bro
+      const isMentioningBro = content.toLowerCase().includes('@bro');
+      
+      if (isMentioningBro) {
+        // Remove @bro from prompt and get AI response
+        const prompt = content.replace(/@bro\s*/gi, '').trim();
+        if (!prompt) {
+          socket.emit('error', { message: 'Please provide a question after @bro' });
+          return;
+        }
+        
+        const aiResponse = await getAIResponse(prompt);
+
+        // Save user message (to the friend they're chatting with)
+        const userMessage = new Message({
+          sender: senderId,
+          receiver: receiverId,
+          content: content
+        });
+        await userMessage.save();
+
+        // Save AI response in the same conversation
+        // Use receiverId as sender so it appears in the same chat thread
+        const aiMessage = new Message({
+          sender: receiverId, // Appears as if from the friend (but marked as AI)
+          receiver: senderId,
+          content: `🤖 @bro: ${aiResponse}`,
+          isAIResponse: true
+        });
+        await aiMessage.save();
+
+        // Emit user message to receiver (if chatting with a friend)
+        const receiverSocketId = connectedUsers.get(receiverId);
+        if (receiverSocketId && receiverId !== senderId) {
+          io.to(receiverSocketId).emit('newMessage', {
+            ...userMessage.toObject(),
+            sender: { _id: senderId },
+            receiver: { _id: receiverId }
+          });
+        }
+
+        // Emit both messages to sender
+        io.to(socket.id).emit('newMessage', {
+          ...userMessage.toObject(),
+          sender: { _id: senderId },
+          receiver: { _id: receiverId }
+        });
+        
+        // Emit AI response to sender
+        io.to(socket.id).emit('newMessage', {
+          ...aiMessage.toObject(),
+          sender: { _id: receiverId, name: '@bro', email: 'ai@chefgpt.com' },
+          receiver: { _id: senderId }
+        });
+      } else {
+        // Regular message
+        const message = new Message({
+          sender: senderId,
+          receiver: receiverId,
+          content: content
+        });
+        await message.save();
+
+        // Send to receiver if online
+        const receiverSocketId = connectedUsers.get(receiverId);
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit('newMessage', {
+            ...message.toObject(),
+            sender: { _id: senderId },
+            receiver: { _id: receiverId }
+          });
+        }
+
+        // Send confirmation to sender
+        socket.emit('messageSent', {
+          ...message.toObject(),
+          sender: { _id: senderId },
+          receiver: { _id: receiverId }
+        });
+      }
+    } catch (error) {
+      console.error('Send message error:', error);
+      socket.emit('error', { message: 'Failed to send message' });
+    }
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    if (socket.userId) {
+      connectedUsers.delete(socket.userId);
+      console.log(`User ${socket.userId} disconnected`);
+    }
+  });
+});
 
 // Step 4: Handle OPTIONS requests (CORS preflight)
 // When frontend makes a request, browser first sends an OPTIONS request
@@ -152,6 +282,8 @@ try {
   app.use('/api/orders', require('./routes/orders')); // Create and view orders
   app.use('/api/cart', require('./routes/cart')); // Shopping cart
   app.use('/api/payments', require('./routes/payments')); // Payment processing
+  app.use('/api/friends', require('./routes/friends')); // Friends management
+  app.use('/api/messages', require('./routes/messages')); // Get messages
   console.log('✅ All routes loaded successfully');
 } catch (error) {
   console.error('❌ Error loading routes:', error);
@@ -196,9 +328,8 @@ console.log(`🚀 Starting server on port ${PORT}...`);
 
 // Step 14: Start the server
 // This is like opening the restaurant for business
-let server;
 try {
-  server = app.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`✅ Health check available at http://0.0.0.0:${PORT}/`);
     console.log(`✅ Server is ready to accept requests`);

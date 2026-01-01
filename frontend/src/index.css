@@ -10,8 +10,16 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
+  transition: background-color 0.3s ease;
+}
+
+[data-theme="light"] body {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+[data-theme="dark"] body {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
 }
 
 code {

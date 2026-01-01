@@ -109,8 +109,11 @@ AI-Powered Restaurant Ordering System with UPI QR Code Payments
 | `SMTP_PORT` | ❌ No | SMTP port (default: 587) | `587` |
 | `SMTP_USER` | ❌ No | SMTP username | `your-email@gmail.com` |
 | `SMTP_PASSWORD` | ❌ No | SMTP password (Gmail App Password) | `your-app-password` |
+
+**📧 Need help configuring SMTP?** See [SMTP_SETUP.md](./SMTP_SETUP.md) for detailed step-by-step instructions!
 | `ADMIN_PHONE` | ❌ No | Phone for WhatsApp notifications | `+919876543210` |
 | `WHATSAPP_API_KEY` | ❌ No | WhatsApp API key | `your-api-key` |
+| `GEMINI_API_KEY` | ❌ No | Google Gemini API key (for @bro AI) | Get free key at https://makersuite.google.com/app/apikey |
 
 ### Frontend (Vercel Environment Variables)
 
@@ -123,21 +126,29 @@ AI-Powered Restaurant Ordering System with UPI QR Code Payments
 
 ## 📝 Features
 
-- ✅ User authentication (mobile number based)
-- ✅ Menu browsing with categories
+- ✅ User authentication (email/password based)
+- ✅ Beautiful animated sign-in/sign-up page with 2 face cards
+- ✅ **Auto-onboard friends** - Automatically create accounts and send invitation emails
+- ✅ **Dark/Light theme** - Toggle between themes with smooth transitions
+- ✅ Menu browsing with 9 curated items and beautiful images
 - ✅ Shopping cart with persistence
 - ✅ UPI QR code payment integration
 - ✅ Order management and tracking
+- ✅ Real-time chat with friends
+- ✅ Add friends by email (auto-onboard if they don't exist)
+- ✅ AI assistant (@bro) powered by Google Gemini
 - ✅ Email notifications (optional)
 - ✅ WhatsApp notifications (optional)
-- ✅ Modern, responsive UI
+- ✅ Modern, responsive UI with production-grade polish
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React, React Router, Axios, QRCode React
-- **Backend**: Node.js, Express, MongoDB, Mongoose
+- **Frontend**: React, React Router, Axios, QRCode React, Socket.io Client
+- **Backend**: Node.js, Express, MongoDB, Mongoose, Socket.io
 - **Payment**: UPI QR Code
-- **Authentication**: JWT (JSON Web Tokens)
+- **Authentication**: JWT (JSON Web Tokens) with bcrypt password hashing
+- **Real-time Chat**: Socket.io for instant messaging
+- **AI Assistant**: Google Gemini AI (free tier)
 - **Email**: Nodemailer (SMTP)
 - **Database**: MongoDB Atlas
 
@@ -146,19 +157,35 @@ AI-Powered Restaurant Ordering System with UPI QR Code Payments
 ```
 chefGPT/
 ├── backend/          # Node.js/Express API
-│   ├── models/       # Database models
-│   ├── routes/       # API routes
-│   ├── services/     # Email, WhatsApp services
+│   ├── models/       # Database models (User, Message, MenuItem, Order, Cart)
+│   ├── routes/       # API routes (auth, menu, orders, cart, payments, friends, messages)
+│   ├── services/     # Services (email, WhatsApp, Gemini AI)
 │   ├── middleware/   # Auth middleware
-│   └── server.js     # Main server file
+│   └── server.js     # Main server file with Socket.io
 ├── frontend/         # React app
 │   ├── src/
 │   │   ├── components/  # React components
-│   │   ├── pages/      # Page components
+│   │   ├── pages/      # Page components (AuthPage, Menu, Chat)
 │   │   └── context/    # React Context (Auth)
 │   └── public/
 └── package.json      # Root package.json (for local dev convenience)
 ```
+
+## 💬 Chat Features
+
+### Real-time Chat with Friends
+- Add friends by email address
+- Real-time messaging using Socket.io
+- Chat interface with message history
+- Clean and modern UI
+
+### AI Assistant (@bro)
+- Mention `@bro` in any chat message to get AI assistance
+- Powered by Google Gemini AI (free tier)
+- Get instant AI responses to your questions
+- Example: "@bro what's the weather like?" or "@bro help me with cooking tips"
+
+**Note**: To use @bro, add `GEMINI_API_KEY` to your backend `.env` file. Get a free API key at https://makersuite.google.com/app/apikey
 
 ## 🔑 Getting Started with MongoDB
 

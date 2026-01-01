@@ -1,19 +1,42 @@
+/* Theme Variables */
+[data-theme="light"] {
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --border-color: #e9ecef;
+  --shadow: rgba(0, 0, 0, 0.08);
+  --shadow-hover: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0a6;
+  --border-color: #3c4043;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-hover: rgba(0, 0, 0, 0.5);
+}
+
 .menu-page {
   min-height: 100vh;
-  background: #f8f9fa;
+  background: var(--bg-primary);
   overflow-x: hidden;
   position: relative;
   z-index: 1;
+  transition: background-color 0.3s ease;
 }
 
 .menu-header {
-  background: #ffffff;
+  background: var(--bg-secondary);
   padding: 20px 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow);
   position: sticky;
   top: 0;
   z-index: 100;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .header-content {
@@ -31,33 +54,86 @@
 
 .restaurant-title {
   font-size: 1.375rem;
-  color: #202124;
+  color: var(--text-primary);
   margin: 0;
   font-weight: 400;
   letter-spacing: 0;
+  transition: color 0.3s ease;
 }
 
 .restaurant-subtitle {
   font-size: 0.875rem;
-  color: #5f6368;
+  color: var(--text-secondary);
   margin: 4px 0 0 0;
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
+  transition: color 0.3s ease;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 15px;
 }
 
 .user-name {
-  color: #202124;
+  color: var(--text-primary);
   font-weight: 500;
   font-size: 1rem;
   font-family: 'Poppins', sans-serif;
   letter-spacing: 0.25px;
+  transition: color 0.3s ease;
+}
+
+.header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-toggle-btn {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--bg-primary);
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.chat-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.8125rem;
+  letter-spacing: 0.25px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chat-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
 }
 
 .logout-btn {
@@ -99,15 +175,17 @@
 .menu-intro h2 {
   font-size: 1.75rem;
   margin-bottom: 8px;
-  color: #202124;
+  color: var(--text-primary);
   font-weight: 400;
   letter-spacing: 0;
+  transition: color 0.3s ease;
 }
 
 .menu-intro p {
   font-size: 0.875rem;
-  color: #5f6368;
+  color: var(--text-secondary);
   font-weight: 400;
+  transition: color 0.3s ease;
 }
 
 .menu-grid {
@@ -119,12 +197,13 @@
 
 .empty-menu {
   text-align: center;
-  color: #6c757d;
+  color: var(--text-secondary);
   padding: 60px 20px;
   font-size: 1.1rem;
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow);
+  transition: all 0.3s ease;
 }
 
 

@@ -32,124 +32,232 @@ router.options('*', (req, res) => {
 });
 
 // ============================================
-// POST /api/auth/auth - Login or Signup
+// POST /api/auth/auth - Login
 // ============================================
-// This endpoint does BOTH login AND signup
-// If user exists → login (return existing user)
-// If user doesn't exist → create new user (signup)
+// Login with email and password
 
 router.post('/auth', async (req, res) => {
   try {
-    // Step 1: Get phone number from request body
-    // Frontend sends: { phone: "9876543210" }
-    const { phone } = req.body;
+    const { email, password } = req.body;
 
-    // Step 2: Validate phone number
-    // Check if phone number exists
-    if (!phone) {
-      return res.status(400).json({ message: 'Where\'s your number?' });
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Please enter your email' });
     }
     
-    // Check if phone is a string (text)
-    if (typeof phone !== 'string') {
-      return res.status(400).json({ message: 'That\'s not a number!' });
+    if (!password) {
+      return res.status(400).json({ message: 'Please enter your password' });
     }
 
-    // Remove spaces from start and end
-    const trimmedPhone = phone.trim();
-    
-    // Check if phone is not empty after trimming
-    if (trimmedPhone.length === 0) {
-      return res.status(400).json({ message: 'Empty? Really?' });
-    }
+    const cleanEmail = email.trim().toLowerCase();
 
-    // Step 3: Clean phone number
-    // Remove all non-digit characters (spaces, dashes, plus signs, etc.)
-    // Example: "+91 98765-43210" becomes "919876543210"
-    // \D means "anything that's not a digit"
-    const cleanPhone = trimmedPhone.replace(/\D/g, '');
-    
-    // Step 4: Check if phone number is exactly 10 digits
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      return res.status(400).json({ message: 'Enter valid mobile number' });
-    }
+    // Check if user exists
+    const user = await User.findOne({ email: cleanEmail });
 
-    // Step 5: Check if user already exists in database
-    // We search for user with this phone number
-    let user = await User.findOne({ phone: cleanPhone });
-    let isNewUser = false; // Track if this is a new user
-
-    // Step 6: If user doesn't exist, create new user
     if (!user) {
-      isNewUser = true; // Mark as new user
-      
-      // Create default name using last 4 digits of phone
-      // Example: phone "9876543210" → name "User 3210"
-      const defaultName = `User ${cleanPhone.slice(-4)}`;
-      
-      // Create new user object
-      user = new User({ 
-        name: defaultName, 
-        phone: cleanPhone 
-      });
-      
-      // Save user to database
-      try {
-        await user.save();
-      } catch (saveError) {
-        console.error('User save error:', saveError);
-        
-        // If there are validation errors, send them to frontend
-        if (saveError.errors) {
-          const fieldErrors = Object.keys(saveError.errors).map(key => saveError.errors[key].message);
-          return res.status(400).json({ message: fieldErrors.join(', ') });
-        }
-        throw saveError; // Re-throw if it's a different error
-      }
+      return res.status(404).json({ message: 'User not found. Please sign up first.' });
     }
 
-    // Step 7: Create JWT token
-    // Token is like a temporary ID card that proves user is logged in
-    // It contains userId and expires in 7 days
-    // Frontend will send this token with every request to prove user is logged in
+    // Verify password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Create JWT token
     const token = jwt.sign(
-      { userId: user._id }, // Data stored in token (user's ID)
-      process.env.JWT_SECRET || 'fallback-secret', // Secret key to sign token (like a password to create tokens)
-      { expiresIn: '7d' } // Token expires in 7 days (like ID card expiry)
+      { userId: user._id },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
     );
 
-    // Step 8: Send response to frontend
-    // Frontend will use this token for all future requests
     res.json({
-      token, // The token (like a session ID)
+      token,
       user: {
-        id: user._id, // User's ID
-        name: user.name, // User's name
-        phone: user.phone, // User's phone
-        email: user.email || null // User's email (if exists)
-      },
-      isNewUser // true if just signed up, false if logged in
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || null
+      }
     });
   } catch (error) {
     console.error('Auth error:', error);
-    console.error('Auth error details:', {
-      message: error.message,
-      code: error.code,
-      name: error.name,
-      stack: error.stack
-    });
-    
-    // If user already exists (duplicate phone number)
-    if (error.code === 11000) {
-      return res.status(409).json({ message: 'Already registered! Just sign in!' });
+    res.status(500).json({ message: 'Authentication failed. Try again!' });
+  }
+});
+
+// ============================================
+// POST /api/auth/signup - Signup
+// ============================================
+// Create new user with email, name, and password
+
+router.post('/signup', async (req, res) => {
+  try {
+    console.log('Signup request received:', { email: req.body.email, hasName: !!req.body.name });
+    const { email, name, password } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Please enter your email' });
     }
     
-    // Any other error - send more details in development
-    const errorMessage = process.env.NODE_ENV === 'production' 
-      ? 'Oops! Something broke. Try again!' 
-      : error.message || 'Oops! Something broke. Try again!';
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Please enter your name' });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
     
-    res.status(500).json({ message: errorMessage });
+    console.log('Processing signup for:', cleanEmail);
+
+    // Check if user already exists
+    let user = await User.findOne({ email: cleanEmail });
+    
+    if (user) {
+      // If user was auto-created (invited by friend), allow them to complete registration
+      if (user.isAutoCreated === true) {
+        // Update user with new password and mark as completed
+        user.name = cleanName;
+        user.password = password; // Will be hashed by pre-save hook
+        user.isAutoCreated = false;
+        await user.save();
+        console.log(`User ${cleanEmail} completed registration (was auto-created)`);
+      } else {
+        // User exists and is fully registered
+        console.log(`Signup attempt for existing user: ${cleanEmail} (isAutoCreated: ${user.isAutoCreated})`);
+        return res.status(409).json({ 
+          message: 'Email already registered. Please sign in! If you forgot your password, try signing in first or contact support.',
+          canCompleteRegistration: false
+        });
+    }
+    } else {
+      // Create new user (password will be hashed by pre-save hook)
+      user = new User({ 
+      name: cleanName, 
+      email: cleanEmail,
+        password: password,
+        isAutoCreated: false,
+      friends: []
+    });
+    await user.save();
+      console.log(`New user created: ${cleanEmail}`);
+    }
+
+    // Create JWT token
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || null
+      }
+    });
+  } catch (error) {
+    console.error('Signup error:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+      email: req.body.email
+    });
+    
+    if (error.code === 11000) {
+      // Duplicate key error (email already exists) - MongoDB unique constraint
+      // Try to find the user and check if they're auto-created
+      try {
+        const existingUser = await User.findOne({ email: cleanEmail });
+        if (existingUser && existingUser.isAutoCreated) {
+          // Allow them to complete registration
+          existingUser.name = cleanName;
+          existingUser.password = password;
+          existingUser.isAutoCreated = false;
+          await existingUser.save();
+          
+          const token = jwt.sign(
+            { userId: existingUser._id },
+            process.env.JWT_SECRET || 'fallback-secret',
+            { expiresIn: '7d' }
+          );
+          
+          return res.json({
+            token,
+            user: {
+              id: existingUser._id,
+              name: existingUser.name,
+              email: existingUser.email,
+              phone: existingUser.phone || null
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error handling duplicate:', e);
+      }
+      return res.status(409).json({ message: 'Email already registered. Please sign in!' });
+    }
+    
+    // Return proper error message for signup
+    res.status(500).json({ 
+      message: 'Registration failed. Please try again. If the problem persists, contact support.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ============================================
+// GET /api/auth/check-email/:email - Check user status by email (for smart email links)
+// ============================================
+// This endpoint checks if a user exists and their status (for email invitation links)
+// Returns: { exists: true/false, isAutoCreated: true/false, shouldSignUp: true/false }
+
+router.get('/check-email/:email', async (req, res) => {
+  try {
+    const email = req.params.email?.trim().toLowerCase();
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      // User doesn't exist - should sign up
+      return res.json({
+        exists: false,
+        isAutoCreated: false,
+        shouldSignUp: true,
+        redirectTo: 'signup'
+      });
+    }
+    
+    if (user.isAutoCreated === true) {
+      // User exists but is auto-created - should complete signup
+      return res.json({
+        exists: true,
+        isAutoCreated: true,
+        shouldSignUp: true,
+        redirectTo: 'signup'
+      });
+    }
+    
+    // User exists and is fully registered - should sign in
+    return res.json({
+      exists: true,
+      isAutoCreated: false,
+      shouldSignUp: false,
+      redirectTo: 'signin'
+    });
+  } catch (error) {
+    console.error('Check email error:', error);
+    res.status(500).json({ message: 'Error checking email status' });
   }
 });
 
@@ -160,17 +268,21 @@ router.post('/auth', async (req, res) => {
 // The 'auth' middleware checks if user is logged in before allowing access
 
 router.get('/me', auth, async (req, res) => {
-  // req.user is set by auth middleware
-  // It contains the logged in user's information
-  // (like showing your visitor badge with your name)
-  res.json({
-    user: {
-      id: req.user._id, // User's ID
-      name: req.user.name, // User's name
-      phone: req.user.phone, // User's phone
-      email: req.user.email || null // User's email (if exists)
-    }
-  });
+  try {
+    const user = await User.findById(req.user._id).populate('friends', 'name email');
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || null,
+        friends: user.friends || []
+      }
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ message: 'Failed to fetch user data' });
+  }
 });
 
 module.exports = router;

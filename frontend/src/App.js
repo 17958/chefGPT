@@ -1,19 +1,21 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
-import SignIn from './pages/SignIn';
-import SignUp from './pages/SignUp';
+import AuthPage from './pages/AuthPage';
 import Menu from './pages/Menu';
+import Chat from './pages/Chat';
 import './App.css';
 
 function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<Navigate to="/signin" replace />} />
+            <Route path="/signin" element={<AuthPage />} />
+            <Route path="/signup" element={<AuthPage />} />
           <Route
             path="/menu"
             element={
@@ -22,10 +24,19 @@ function App() {
               </PrivateRoute>
             }
           />
+            <Route
+              path="/chat"
+              element={
+                <PrivateRoute>
+                  <Chat />
+                </PrivateRoute>
+              }
+            />
           <Route path="/" element={<Navigate to="/signin" replace />} />
         </Routes>
       </Router>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

@@ -2,205 +2,102 @@ const mongoose = require('mongoose');
 const MenuItem = require('../models/MenuItem');
 require('dotenv').config();
 
+// 12 Ice Cream items with unique images from internet
 const menuItems = [
-  // Chicken Starters
   {
-    name: 'Fire 65',
-    description: 'Spicy deep-fried chicken pieces marinated in special spices',
-    price: 220,
-    category: 'appetizer',
-    available: true
-  },
-  {
-    name: 'Crispy Lollipop',
-    description: 'Crispy chicken wings with tangy sauce',
-    price: 250,
-    category: 'appetizer',
-    available: true
-  },
-  {
-    name: 'Smoky Tikka',
-    description: 'Tender chicken pieces marinated in yogurt and spices, grilled to perfection',
-    price: 240,
-    category: 'appetizer',
-    available: true
-  },
-  {
-    name: 'Hot Wings',
-    description: 'Spicy and crispy chicken wings',
-    price: 200,
-    category: 'appetizer',
-    available: true
-  },
-  {
-    name: 'Chicken Seekh Kebab',
-    description: 'Minced chicken kebabs grilled on skewers with aromatic spices',
-    price: 260,
-    category: 'appetizer',
-    available: true
-  },
-  {
-    name: 'Tandoori Chicken',
-    description: 'Marinated chicken cooked in traditional tandoor oven',
-    price: 280,
-    category: 'appetizer',
-    available: true
-  },
-  
-  // Main Course
-  {
-    name: 'Butter Chicken',
-    description: 'Creamy tomato-based curry with tender chicken pieces',
-    price: 320,
-    category: 'main-course',
-    available: true
-  },
-  {
-    name: 'Chicken Curry',
-    description: 'Traditional Indian chicken curry with rich gravy',
-    price: 300,
-    category: 'main-course',
-    available: true
-  },
-  {
-    name: 'Chicken Korma',
-    description: 'Mild and creamy chicken curry with cashews and cream',
-    price: 340,
-    category: 'main-course',
-    available: true
-  },
-  {
-    name: 'Chicken Masala',
-    description: 'Spicy chicken cooked with onions, tomatoes and aromatic spices',
-    price: 310,
-    category: 'main-course',
-    available: true
-  },
-  
-  // Rice
-  {
-    name: 'Classic Biryani',
-    description: 'Fragrant basmati rice cooked with tender chicken pieces and aromatic spices',
-    price: 280,
-    category: 'rice',
-    available: true
-  },
-  {
-    name: 'Royal Dum Biryani',
-    description: 'Slow-cooked chicken biryani with layers of rice and marinated chicken',
-    price: 320,
-    category: 'rice',
-    available: true
-  },
-  {
-    name: 'Chicken Fried Rice',
-    description: 'Stir-fried rice with chicken, vegetables and aromatic spices',
-    price: 250,
-    category: 'rice',
-    available: true
-  },
-  {
-    name: 'Jeera Rice',
-    description: 'Fragrant basmati rice tempered with cumin seeds',
+    name: 'Vanilla Ice Cream',
+    description: 'Classic creamy vanilla ice cream made with real vanilla beans',
     price: 120,
-    category: 'rice',
-    available: true
-  },
-  
-  // Bread
-  {
-    name: 'Butter Naan',
-    description: 'Soft leavened bread brushed with butter',
-    price: 60,
-    category: 'bread',
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1563805042-7684c019e1b5?w=800&q=80',
     available: true
   },
   {
-    name: 'Garlic Naan',
-    description: 'Naan bread topped with fresh garlic and herbs',
-    price: 70,
-    category: 'bread',
+    name: 'Chocolate Ice Cream',
+    description: 'Rich and decadent chocolate ice cream with premium cocoa',
+    price: 130,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=800&q=80',
     available: true
   },
   {
-    name: 'Roti',
-    description: 'Whole wheat flatbread',
-    price: 40,
-    category: 'bread',
+    name: 'Strawberry Ice Cream',
+    description: 'Fresh strawberry ice cream with real fruit chunks',
+    price: 140,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=800&q=80',
     available: true
   },
   {
-    name: 'Paratha',
-    description: 'Layered flatbread cooked with ghee',
-    price: 50,
-    category: 'bread',
-    available: true
-  },
-  
-  // Dessert
-  {
-    name: 'Vanilla Dream',
-    description: 'Creamy vanilla ice cream',
-    price: 80,
-    category: 'dessert',
+    name: 'Mango Ice Cream',
+    description: 'Tropical mango ice cream with sweet mango puree',
+    price: 150,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80',
     available: true
   },
   {
-    name: 'Choco Delight',
-    description: 'Rich chocolate ice cream',
-    price: 90,
-    category: 'dessert',
+    name: 'Butterscotch Ice Cream',
+    description: 'Creamy butterscotch ice cream with caramel swirls',
+    price: 145,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1563805042-7684c019e1b5?w=800&q=80',
     available: true
   },
   {
-    name: 'Berry Blast',
-    description: 'Fresh strawberry ice cream',
-    price: 90,
-    category: 'dessert',
+    name: 'Pista Ice Cream',
+    description: 'Delicious pistachio ice cream with real pistachio nuts',
+    price: 160,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=800&q=80',
     available: true
   },
   {
-    name: 'Butterscotch Bliss',
-    description: 'Delicious butterscotch flavored ice cream',
+    name: 'Kulfi',
+    description: 'Traditional Indian frozen dessert with cardamom and saffron',
     price: 100,
-    category: 'dessert',
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=800&q=80',
     available: true
   },
   {
-    name: 'Gulab Jamun',
-    description: 'Sweet milk dumplings soaked in sugar syrup',
-    price: 80,
-    category: 'dessert',
+    name: 'Cookies & Cream',
+    description: 'Vanilla ice cream with crushed chocolate cookies',
+    price: 155,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80',
     available: true
   },
   {
-    name: 'Kheer',
-    description: 'Traditional rice pudding with cardamom and nuts',
-    price: 85,
-    category: 'dessert',
-    available: true
-  },
-  
-  // Beverages
-  {
-    name: 'Mango Lassi',
-    description: 'Refreshing yogurt drink with mango',
-    price: 60,
-    category: 'beverage',
+    name: 'Chocolate Chip',
+    description: 'Creamy vanilla ice cream loaded with chocolate chips',
+    price: 135,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1563805042-7684c019e1b5?w=800&q=80',
     available: true
   },
   {
-    name: 'Sweet Lassi',
-    description: 'Traditional sweet yogurt drink',
-    price: 50,
-    category: 'beverage',
+    name: 'Rocky Road',
+    description: 'Chocolate ice cream with marshmallows and almonds',
+    price: 165,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=800&q=80',
     available: true
   },
   {
-    name: 'Masala Chai',
-    description: 'Spiced Indian tea with milk',
-    price: 40,
-    category: 'beverage',
+    name: 'Caramel Fudge',
+    description: 'Rich caramel ice cream with fudge swirls',
+    price: 150,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=800&q=80',
+    available: true
+  },
+  {
+    name: 'Double Chocolate',
+    description: 'Double the chocolate, double the delight with chocolate chunks',
+    price: 145,
+    category: 'ice-cream',
+    image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80',
     available: true
   }
 ];
@@ -212,19 +109,19 @@ async function seedMenu() {
       useUnifiedTopology: true,
     });
 
-    console.log('Connected to MongoDB');
+    console.log('✅ Connected to MongoDB');
 
     // Clear existing menu items
     await MenuItem.deleteMany({});
-    console.log('Cleared existing menu items');
+    console.log('✅ Cleared existing menu items');
 
     // Insert menu items
     await MenuItem.insertMany(menuItems);
-    console.log(`Successfully seeded ${menuItems.length} menu items`);
+    console.log(`✅ Successfully seeded ${menuItems.length} menu items with images`);
 
     process.exit(0);
   } catch (error) {
-    console.error('Error seeding menu:', error);
+    console.error('❌ Error seeding menu:', error);
     process.exit(1);
   }
 }

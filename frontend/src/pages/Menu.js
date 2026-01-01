@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import axios from 'axios';
 import MenuCard from '../components/MenuCard';
 import Cart from '../components/Cart';
@@ -11,6 +12,7 @@ const Menu = () => {
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -151,7 +153,23 @@ const Menu = () => {
           </div>
           <div className="header-actions">
             <span className="user-name">Hey {getWelcomeMessage(user)}!</span>
-            <button onClick={logout} className="logout-btn">Logout</button>
+            <div className="header-buttons">
+              <button 
+                onClick={toggleTheme}
+                className="theme-toggle-btn"
+                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+              >
+                {theme === 'light' ? '🌙' : '☀️'}
+              </button>
+              <button 
+                onClick={() => navigate('/chat')} 
+                className="chat-btn"
+                title="Chat with Friends"
+              >
+                💬 Chat
+              </button>
+              <button onClick={logout} className="logout-btn">Logout</button>
+            </div>
           </div>
         </div>
       </header>

@@ -22,7 +22,7 @@ const menuItemSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: ['appetizer', 'main-course', 'dessert', 'beverage', 'rice', 'curry', 'bread']
+    enum: ['appetizer', 'main-course', 'dessert', 'beverage', 'rice', 'curry', 'bread', 'ice-cream']
   },
   image: {
     type: String,

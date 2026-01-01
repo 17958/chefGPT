@@ -5,7 +5,7 @@
   "scripts": {
     "build": "cd backend && npm install",
     "postinstall": "cd backend && npm install",
-    "raju": "concurrently \"npm run backend:dev\" \"npm run frontend:start\"",
+    "raja": "concurrently \"npm run backend:dev\" \"npm run frontend:start\"",
     "backend:dev": "cd backend && npm run dev",
     "backend:start": "cd backend && npm start",
     "frontend:start": "cd frontend && npm start",

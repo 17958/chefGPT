@@ -1,19 +1,20 @@
 .menu-card {
-  background: #ffffff;
+  background: var(--bg-secondary, #ffffff);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow, rgba(0, 0, 0, 0.08));
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   height: 100%;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border-color, #e9ecef);
 }
 
 .menu-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border-color: #dadce0;
+  box-shadow: 0 4px 16px var(--shadow-hover, rgba(0, 0, 0, 0.15));
+  border-color: var(--border-color, #dadce0);
+  transform: translateY(-4px);
 }
 
 .menu-card-image {
@@ -54,25 +55,28 @@
 
 .menu-card-name {
   font-size: 1rem;
-  color: #202124;
+  color: var(--text-primary, #202124);
   margin: 0 0 4px 0;
   font-weight: 400;
   letter-spacing: 0;
+  transition: color 0.3s ease;
 }
 
 .menu-card-name-telugu {
   font-size: 0.875rem;
-  color: #5f6368;
+  color: var(--text-secondary, #5f6368);
   margin: 0 0 8px 0;
   font-weight: 400;
+  transition: color 0.3s ease;
 }
 
 .menu-card-description {
   font-size: 0.8125rem;
-  color: #5f6368;
+  color: var(--text-secondary, #5f6368);
   margin: 0 0 16px 0;
   line-height: 1.5;
   flex-grow: 1;
+  transition: color 0.3s ease;
 }
 
 .menu-card-footer {
@@ -85,8 +89,9 @@
 .menu-card-price {
   font-size: 1.125rem;
   font-weight: 500;
-  color: #202124;
+  color: var(--text-primary, #202124);
   letter-spacing: 0;
+  transition: color 0.3s ease;
 }
 
 .menu-card-button {

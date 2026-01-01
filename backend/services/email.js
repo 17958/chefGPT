@@ -158,4 +158,133 @@ ChefGPT Restaurant
   }
 }
 
-module.exports = { sendEmailNotification };
+/**
+ * Send invitation email to new user (free onboarding)
+ * @param {string} friendEmail - Email of the friend being invited
+ * @param {string} friendName - Name of the friend
+ * @param {string} inviterName - Name of person who invited them
+ * @param {string} tempPassword - Temporary password for login (null if existing user)
+ * @returns {object} - { success: true/false, message: '...' }
+ */
+async function sendInvitationEmail(friendEmail, friendName, inviterName, tempPassword) {
+  const isExistingUser = !tempPassword;
+  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpPort = process.env.SMTP_PORT || 587;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASSWORD;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+  // If no SMTP configured, just log (for free tier)
+  if (!smtpUser || !smtpPass) {
+    console.log('\n=== INVITATION EMAIL (SMTP not configured) ===');
+    console.log('To:', friendEmail);
+    if (isExistingUser) {
+      console.log('Subject: You have a new friend on ChefGPT!');
+      console.log(`Body: Hi ${friendName}, ${inviterName} added you as a friend!`);
+      console.log(`Smart link: ${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}`);
+    } else {
+      console.log('Subject: Welcome to ChefGPT!');
+      console.log(`Body: Hi ${friendName}, ${inviterName} invited you to ChefGPT!`);
+      console.log(`Smart link: ${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}`);
+      console.log(`Email: ${friendEmail}`);
+      console.log(`Temporary Password: ${tempPassword}`);
+      console.log('Complete registration by signing up with your own password.');
+    }
+    console.log('==========================================\n');
+    return { success: true, message: 'Invitation logged (SMTP not configured)' };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass
+      }
+    });
+
+    const emailSubject = isExistingUser 
+      ? `👋 ${inviterName} added you as a friend on ChefGPT!`
+      : `🎉 Welcome to ChefGPT! ${inviterName} invited you!`;
+    
+    const emailContent = isExistingUser ? `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+          <h2 style="color: #667eea; text-align: center;">👋 You have a new friend!</h2>
+          <p>Hi ${friendName},</p>
+          <p><strong>${inviterName}</strong> added you as a friend on ChefGPT!</p>
+          
+          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+            <p style="margin: 0 0 10px 0;"><strong>💬 Start Chatting:</strong></p>
+            <p style="margin: 5px 0;">Sign in to ChefGPT and start chatting with ${inviterName}!</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+              Sign In to Chat →
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px; text-align: center;">
+            Happy chatting! 💬<br>
+            <strong>ChefGPT Team</strong>
+          </p>
+        </div>
+      ` : `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+          <h2 style="color: #667eea; text-align: center;">🎉 Welcome to ChefGPT!</h2>
+          <p>Hi ${friendName},</p>
+          <p><strong>${inviterName}</strong> invited you to join ChefGPT - an AI-powered restaurant platform with real-time chat!</p>
+          
+          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+            <p style="margin: 0 0 10px 0;"><strong>📧 Your Account Details:</strong></p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${friendEmail}</p>
+            <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 14px;">${tempPassword}</code></p>
+            <p style="color: #d32f2f; font-size: 14px; margin: 10px 0 0 0; font-weight: bold;">⚠️ Important: Complete your registration by signing up with your own password!</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+              Get Started →
+            </a>
+          </div>
+          
+          <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #1976d2;"><strong>💡 What to do:</strong></p>
+            <ol style="margin: 10px 0 0 20px; padding: 0; font-size: 14px; color: #424242;">
+              <li>Click the button above to go to the signup page</li>
+              <li>Your email will be pre-filled</li>
+              <li>Enter your name and choose a new password</li>
+              <li>Start chatting with ${inviterName} and ordering delicious food!</li>
+            </ol>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px; text-align: center;">
+            Happy ordering! 🍽️<br>
+            <strong>ChefGPT Team</strong>
+          </p>
+        </div>
+      `;
+
+    const info = await transporter.sendMail({
+      from: `"ChefGPT" <${smtpUser}>`,
+      to: friendEmail,
+      subject: emailSubject,
+      html: emailContent
+    });
+
+    console.log('Invitation email sent:', info.messageId);
+    return { success: true, message: 'Invitation email sent' };
+  } catch (error) {
+    console.error('Invitation email error:', error);
+    // Log even if sending fails
+    console.log('\n=== INVITATION EMAIL (Failed to send) ===');
+    console.log('To:', friendEmail);
+    console.log(`Temporary Password: ${tempPassword}`);
+    console.log('==========================================\n');
+    return { success: false, message: 'Failed to send invitation email' };
+  }
+}
+
+module.exports = { sendEmailNotification, sendInvitationEmail };
