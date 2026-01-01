@@ -20,20 +20,56 @@ async function getAIResponse(prompt) {
       return "Hey! I'm @bro, your AI assistant. To use me, add GEMINI_API_KEY to your .env file. Get a free API key at https://makersuite.google.com/app/apikey";
     }
 
-    // Use gemini-1.5-flash (faster, free tier) or gemini-1.5-pro (more capable)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const chatPrompt = `You are @bro, a friendly and helpful AI assistant. 
-    Keep responses concise, friendly, and helpful. 
-    User message: ${prompt}
-    
-    Respond naturally and conversationally:`;
+    // Try different model names in order of preference
+    const modelNames = [
+      'gemini-pro',           // Most stable and widely available
+      'gemini-1.0-pro',      // Alternative stable model
+      'gemini-1.5-pro',      // If available
+      'gemini-2.0-flash-exp' // Experimental
+    ];
 
-    const result = await model.generateContent(chatPrompt);
-    const response = await result.response;
-    return response.text() || "Sorry, I couldn't generate a response. Try again!";
+    let lastError = null;
+    
+    for (const modelName of modelNames) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        
+        const chatPrompt = `You are @bro, a friendly and helpful AI assistant. 
+        Keep responses concise, friendly, and helpful. 
+        User message: ${prompt}
+        
+        Respond naturally and conversationally:`;
+
+        const result = await model.generateContent(chatPrompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        if (text) {
+          console.log(`✅ Using model: ${modelName}`);
+          return text;
+        }
+      } catch (error) {
+        console.log(`⚠️ Model ${modelName} failed, trying next...`);
+        lastError = error;
+        continue;
+      }
+    }
+
+    // If all models failed, throw the last error
+    throw lastError || new Error('All models failed');
   } catch (error) {
     console.error('Gemini AI error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    });
+    
+    // Return user-friendly error message
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
+      return "Sorry! The AI model is currently unavailable. Please check your GEMINI_API_KEY and try again later.";
+    }
+    
     return "Oops! I'm having trouble right now. Try again in a moment!";
   }
 }

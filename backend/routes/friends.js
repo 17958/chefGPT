@@ -156,9 +156,9 @@ router.post('/', auth, async (req, res) => {
     await friendRequest.populate('from', 'name email');
     console.log('✅ Friend request created:', friendRequest._id);
 
-    // Emit socket event to notify the friend (if they're online)
+    // Emit socket events to notify both users
     if (ioInstance) {
-      // Emit to all sockets, client will filter by userId
+      // Notify the receiver (friend) about new request
       ioInstance.emit('friendRequest', {
         type: 'newRequest',
         to: friend._id.toString(),
@@ -171,7 +171,22 @@ router.post('/', auth, async (req, res) => {
           }
         }
       });
-      console.log('📤 Friend request notification sent via socket to:', friend._id);
+      
+      // Notify the sender that request was sent
+      ioInstance.emit('friendRequest', {
+        type: 'sent',
+        to: req.user._id.toString(),
+        request: {
+          id: friendRequest._id,
+          to: {
+            id: friend._id,
+            name: friend.name || 'Someone',
+            email: friend.email
+          }
+        }
+      });
+      
+      console.log('📤 Friend request notifications sent');
     }
 
     res.json({ 
@@ -291,7 +306,7 @@ router.post('/accept/:requestId', auth, async (req, res) => {
           }
         }
       });
-      console.log('📤 Friend request accepted notification sent via socket to:', fromUser._id);
+      console.log('📤 Friend request accepted notification sent');
     }
 
     // Populate and return updated friends list
@@ -333,15 +348,21 @@ router.post('/reject/:requestId', auth, async (req, res) => {
 
     // Emit socket event to notify the requester
     const fromUser = await User.findById(friendRequest.from);
-    if (ioInstance && fromUser) {
+    const toUser = await User.findById(friendRequest.to);
+    if (ioInstance && fromUser && toUser) {
       ioInstance.emit('friendRequest', {
         type: 'rejected',
         to: fromUser._id.toString(),
         request: {
-          id: friendRequest._id
+          id: friendRequest._id,
+          from: {
+            id: toUser._id,
+            name: toUser.name || 'Someone',
+            email: toUser.email || ''
+          }
         }
       });
-      console.log('📤 Friend request rejected notification sent via socket to:', fromUser._id);
+      console.log('📤 Friend request rejected notification sent');
     }
 
     res.json({ message: 'Friend request rejected' });

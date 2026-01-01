@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import io from 'socket.io-client';
 import './Chat.css';
-// test comment
+
 const Chat = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();

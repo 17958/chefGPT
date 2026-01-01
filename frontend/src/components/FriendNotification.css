@@ -18,6 +18,16 @@
   opacity: 1;
 }
 
+.friend-notification.clickable .friend-notification-content {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.friend-notification.clickable .friend-notification-content:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
 @keyframes slideIn {
   from {
     transform: translateX(400px);
@@ -123,6 +133,16 @@
 .friend-notification-reject:hover {
   background: #e0e0e0;
   transform: translateY(-1px);
+}
+
+.friend-notification-click-hint {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #667eea;
+  font-weight: 500;
 }
 
 /* Dark mode support */
