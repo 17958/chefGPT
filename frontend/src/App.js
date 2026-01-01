@@ -15,8 +15,8 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
-          <NotificationManager />
           <Router>
+            <NotificationManager />
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/signin" element={<AuthPage />} />

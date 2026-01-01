@@ -8,13 +8,11 @@ const AuthPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  // Determine initial state based on route - use window.location as fallback
+  // Determine initial state based on route
   const getInitialSignInState = () => {
     try {
-      const pathname = location?.pathname || (typeof window !== 'undefined' ? window.location.pathname : '/signin');
-      if (pathname === '/signup') return false;
-      if (pathname === '/signin' || pathname === '/auth') return true;
-      return true; // default to signin
+      const pathname = location?.pathname || '/signin';
+      return pathname === '/signup' ? false : true;
     } catch (error) {
       console.error('Error determining initial state:', error);
       return true; // default to signin
