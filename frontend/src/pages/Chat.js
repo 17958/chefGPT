@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
@@ -14,9 +14,33 @@ const Chat = () => {
   const [newMessage, setNewMessage] = useState('');
   const [friendEmail, setFriendEmail] = useState('');
   const [showAddFriend, setShowAddFriend] = useState(false);
+  const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [socket, setSocket] = useState(null);
   const messagesEndRef = useRef(null);
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  const fetchFriends = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/friends`);
+      setFriends(response.data.friends || []);
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+    }
+  }, [API_URL]);
+
+  const fetchMessages = useCallback(async (friendId) => {
+    try {
+      const response = await axios.get(`${API_URL}/api/messages/${friendId}`);
+      setMessages(response.data.messages || []);
+      scrollToBottom();
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  }, [API_URL, scrollToBottom]);
 
   // Initialize Socket.io connection
   useEffect(() => {
@@ -48,49 +72,27 @@ const Chat = () => {
         newSocket.disconnect();
       };
     }
-  }, [user, token, API_URL]);
+  }, [user, token, API_URL, scrollToBottom]);
 
   // Fetch friends list
   useEffect(() => {
     if (user) {
       fetchFriends();
     }
-  }, [user]);
+  }, [user, fetchFriends]);
 
   // Fetch messages when friend is selected
   useEffect(() => {
     if (selectedFriend && user) {
       fetchMessages(selectedFriend._id || selectedFriend.id);
     }
-  }, [selectedFriend, user]);
-
-  const fetchFriends = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/friends`);
-      setFriends(response.data.friends || []);
-    } catch (error) {
-      console.error('Error fetching friends:', error);
-    }
-  };
-
-  const fetchMessages = async (friendId) => {
-    try {
-      const response = await axios.get(`${API_URL}/api/messages/${friendId}`);
-      setMessages(response.data.messages || []);
-      scrollToBottom();
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
-  };
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, [selectedFriend, user, fetchMessages]);
 
   const handleAddFriend = async (e) => {
     e.preventDefault();
-    if (!friendEmail.trim()) return;
+    if (!friendEmail.trim() || isAddingFriend) return;
 
+    setIsAddingFriend(true);
     try {
       console.log('Adding friend:', friendEmail.trim());
       const response = await axios.post(`${API_URL}/api/friends`, { 
@@ -116,6 +118,8 @@ const Chat = () => {
                           error.message || 
                           'Failed to add friend. Please check the email and try again.';
       alert(errorMessage);
+    } finally {
+      setIsAddingFriend(false);
     }
   };
 
@@ -153,11 +157,27 @@ const Chat = () => {
               placeholder="Enter friend's email"
               value={friendEmail}
               onChange={(e) => setFriendEmail(e.target.value)}
+              disabled={isAddingFriend}
               required
             />
             <div className="add-friend-buttons">
-              <button type="submit">Add</button>
-              <button type="button" onClick={() => setShowAddFriend(false)}>Cancel</button>
+              <button 
+                type="submit" 
+                disabled={isAddingFriend}
+                className={isAddingFriend ? 'loading' : ''}
+              >
+                {isAddingFriend ? 'Adding...' : 'Add'}
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowAddFriend(false);
+                  setFriendEmail('');
+                }}
+                disabled={isAddingFriend}
+              >
+                Cancel
+              </button>
             </div>
           </form>
         )}
