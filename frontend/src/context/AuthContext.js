@@ -12,8 +12,20 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
+  // Safely get token from localStorage
+  const getInitialToken = () => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return localStorage.getItem('token');
+      }
+    } catch (error) {
+      console.error('Error accessing localStorage:', error);
+    }
+    return null;
+  };
+
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(getInitialToken());
   const [loading, setLoading] = useState(true);
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -21,7 +33,13 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('token');
+      }
+    } catch (error) {
+      console.error('Error removing token from localStorage:', error);
+    }
     delete axios.defaults.headers.common['Authorization'];
   }, []);
 
@@ -70,7 +88,13 @@ export const AuthProvider = ({ children }) => {
       const { token: newToken, user: userData } = response.data;
       setToken(newToken);
       setUser(userData);
-      localStorage.setItem('token', newToken);
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem('token', newToken);
+        }
+      } catch (error) {
+        console.error('Error saving token to localStorage:', error);
+      }
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       return { success: true };
     } catch (error) {
@@ -135,7 +159,13 @@ export const AuthProvider = ({ children }) => {
       const { token: newToken, user: userData } = response.data;
       setToken(newToken);
       setUser(userData);
-      localStorage.setItem('token', newToken);
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem('token', newToken);
+        }
+      } catch (error) {
+        console.error('Error saving token to localStorage:', error);
+      }
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       return { success: true };
     } catch (error) {

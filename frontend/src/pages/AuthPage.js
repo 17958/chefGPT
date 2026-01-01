@@ -5,11 +5,20 @@ import './AuthPage.css';
 
 const AuthPage = () => {
   const location = useLocation();
-  // Determine initial state based on route
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Determine initial state based on route - use window.location as fallback
   const getInitialSignInState = () => {
-    if (location.pathname === '/signup') return false;
-    if (location.pathname === '/signin') return true;
-    return true; // default to signin
+    try {
+      const pathname = location?.pathname || (typeof window !== 'undefined' ? window.location.pathname : '/signin');
+      if (pathname === '/signup') return false;
+      if (pathname === '/signin' || pathname === '/auth') return true;
+      return true; // default to signin
+    } catch (error) {
+      console.error('Error determining initial state:', error);
+      return true; // default to signin
+    }
   };
   
   const [isSignIn, setIsSignIn] = useState(getInitialSignInState());
@@ -23,8 +32,6 @@ const AuthPage = () => {
   const [signUpError, setSignUpError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   // Update state when route changes
   useEffect(() => {
