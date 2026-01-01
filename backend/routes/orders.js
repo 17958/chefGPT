@@ -71,26 +71,31 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
-    // Step 5: Create new order in database
+    // Step 5: Validate user data
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    // Step 6: Create new order in database
     const order = new Order({
       user: req.user._id, // Who placed the order
       items: orderItems, // List of items
       orderType, // "take-away" or "dine-in"
       totalAmount, // Total price
-      customerName: req.user.name, // Customer name
+      customerName: req.user.name || 'Guest', // Customer name (fallback to 'Guest')
       customerPhone: '', // Phone not collected (removed from user model)
-      customerEmail: req.user.email, // Customer email
+      customerEmail: req.user.email || '', // Customer email (fallback to empty string)
       paymentStatus: 'pending' // Payment not verified yet
     });
 
-    // Step 6: Save order to database
+    // Step 7: Save order to database
     await order.save();
     
-    // Step 7: Fill in full menu item details
+    // Step 8: Fill in full menu item details
     // This replaces menu item IDs with full menu item objects
     await order.populate('items.menuItem');
 
-    // Step 8: Send email notification to admin
+    // Step 9: Send email notification to admin
     // We use try-catch so if email fails, order still gets created
     // (We don't want to fail the order just because email failed)
     try {
@@ -100,12 +105,20 @@ router.post('/', auth, async (req, res) => {
       // Don't fail the order if email fails
     }
 
-    // Step 9: Send order back to frontend
+    // Step 10: Send order back to frontend
     res.status(201).json(order); // 201 = Created
   } catch (error) {
     // If something goes wrong, log error and send error message
     console.error('Order creation error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(500).json({ 
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
