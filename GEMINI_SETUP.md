@@ -42,9 +42,34 @@ Example messages:
 - `@bro help me with cooking tips`
 - `@bro tell me a joke`
 
+## Pricing & Free Tier
+
+**Yes, these models are FREE with limits:**
+
+- **Free Tier Limits:**
+  - **15 requests per minute** (RPM) for most models
+  - **1,500 requests per day** (RPD) 
+  - **1 million tokens per minute** (TPM)
+
+- **Models Used (all have free tier):**
+  - `gemini-1.5-flash` - Fast, efficient, **FREE** ✅
+  - `gemini-1.5-pro` - More capable, **FREE** ✅
+  - `gemini-pro` - Stable fallback, **FREE** ✅
+
+- **If you exceed free limits:**
+  - You'll get rate limit errors
+  - The app will show a friendly error message
+  - Wait a minute and try again, or upgrade to paid tier
+
+- **Paid Tier (optional):**
+  - Starts at $0.075 per million input tokens
+  - Only needed for high-volume production use
+  - Most personal/small projects stay within free tier
+
 ## Note
 
 - The API key is **free** for personal use
 - Without the API key, @bro will show a message asking you to add the key
 - The API key is only used on the backend, never exposed to the frontend
+- Free tier is usually enough for personal projects and testing
 
