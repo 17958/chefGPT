@@ -1,26 +1,47 @@
-const axios = require('axios');
+// ============================================
+// WHATSAPP SERVICE - Sends WhatsApp notifications for new orders
+// ============================================
+// This file handles sending WhatsApp messages when a new order is placed
+// Currently this is a placeholder - actual WhatsApp integration needs to be added
+
+const axios = require('axios'); // Library to make HTTP requests (for WhatsApp API)
 
 /**
  * Send WhatsApp notification for new order
  * You can integrate with services like Twilio, WhatsApp Business API, or Wati.io
  * This is a placeholder implementation
+ * 
+ * @param {object} order - The order object with all order details
+ * @returns {object} - { success: true/false, message: '...' }
+ * 
+ * How it works:
+ * 1. Gets admin phone and API key from .env file
+ * 2. Formats order details into a WhatsApp message
+ * 3. Logs the message (actual sending needs API integration)
  */
 async function sendWhatsAppNotification(order) {
-  const adminPhone = process.env.ADMIN_PHONE;
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const whatsappApiKey = process.env.WHATSAPP_API_KEY;
+  // Step 1: Get WhatsApp settings from environment variables
+  // These are stored in .env file
+  const adminPhone = process.env.ADMIN_PHONE; // Admin's phone number
+  const adminEmail = process.env.ADMIN_EMAIL; // Admin's email (as fallback)
+  const whatsappApiKey = process.env.WHATSAPP_API_KEY; // API key for WhatsApp service
 
+  // Step 2: Check if admin contact info is provided
   if (!adminPhone && !adminEmail) {
     console.log('No admin contact info provided, skipping WhatsApp notification');
     return;
   }
 
-  // Format order details
+  // Step 3: Format order details into a WhatsApp message
+  // Loop through each item and create a line like "• Biryani x2 - ₹300"
   const orderDetails = order.items.map(item => {
-    const menuItem = item.menuItem;
-    return `  • ${menuItem.name} x${item.quantity} - ₹${item.price * item.quantity}`;
-  }).join('\n');
+    const menuItem = item.menuItem; // Get menu item details
+    const itemTotal = item.price * item.quantity; // Calculate total for this item
+    return `  • ${menuItem.name} x${item.quantity} - ₹${itemTotal}`;
+  }).join('\n'); // Join all lines with newline character
 
+  // Step 4: Create WhatsApp message
+  // *text* makes text bold in WhatsApp
   const message = `
 🍽️ *New Order Received!*
 
@@ -37,12 +58,14 @@ ${orderDetails}
 *Time:* ${new Date(order.createdAt).toLocaleString('en-IN')}
   `.trim();
 
-  // If you have WhatsApp API configured, use it here
+  // Step 5: If WhatsApp API is configured, use it here
   // Example with Twilio or WhatsApp Business API:
   if (whatsappApiKey && adminPhone) {
     try {
-      // Replace this with your actual WhatsApp API integration
+      // TODO: Replace this with your actual WhatsApp API integration
       // Example: await axios.post('https://api.twilio.com/...', { ... });
+      // Example: await axios.post('https://api.whatsapp.com/...', { ... });
+      
       console.log('WhatsApp notification would be sent:', message);
       console.log('To:', adminPhone);
       
@@ -57,7 +80,8 @@ ${orderDetails}
     }
   }
 
-  // Also send email notification as fallback
+  // Step 6: Also send email notification as fallback
+  // If WhatsApp fails, at least send email
   if (adminEmail) {
     try {
       // You can integrate with nodemailer or sendgrid here
@@ -69,8 +93,8 @@ ${orderDetails}
     }
   }
 
+  // Step 7: Return success
   return { success: true, message: 'Notification sent' };
 }
 
 module.exports = { sendWhatsAppNotification };
-
