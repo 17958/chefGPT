@@ -8,8 +8,10 @@ Based on your SendGrid account, here's what you need:
 Server: smtp.sendgrid.net
 Port: 587 (TLS) or 465 (SSL)
 Username: apikey
-Password: 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
+Password: SG.your-sendgrid-api-key-here
 ```
+
+**Note:** Replace `SG.your-sendgrid-api-key-here` with your actual SendGrid API key from your SendGrid dashboard (Settings → API Keys).
 
 ## 📋 Setup Steps
 
@@ -22,9 +24,11 @@ Password: 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
 SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USER=apikey
-SMTP_PASSWORD=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
+SMTP_PASSWORD=SG.your-sendgrid-api-key-here
 FRONTEND_URL=http://localhost:3000
 ```
+
+**Note:** Replace `SG.your-sendgrid-api-key-here` with your actual SendGrid API key.
 
 3. **Restart your backend server**
 
@@ -40,8 +44,10 @@ FRONTEND_URL=http://localhost:3000
 | `SMTP_HOST` | `smtp.sendgrid.net` |
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | `apikey` |
-| `VALUE` | `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` |
+| `SMTP_PASSWORD` | `SG.your-sendgrid-api-key-here` |
 | `FRONTEND_URL` | `https://chef-gpt-tau.vercel.app` |
+
+**Note:** Replace `SG.your-sendgrid-api-key-here` with your actual SendGrid API key from your SendGrid dashboard.
 
 5. **Redeploy your backend** (Railway will auto-redeploy when you add variables)
 
@@ -105,8 +111,8 @@ Monitor your emails:
 - Never commit it to Git
 - Don't share it publicly
 - If exposed, regenerate it in SendGrid dashboard
+- Use environment variables, never hardcode in files
 
 ---
 
 **Need help?** Check the backend console logs - they show detailed email sending status!
-

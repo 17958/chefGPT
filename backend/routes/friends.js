@@ -51,7 +51,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// POST /api/friends - Add friend by email (auto-onboard if not exists)
+// POST /api/friends - Add friend by email
 router.post('/', auth, async (req, res) => {
   try {
     const { email } = req.body;
@@ -68,28 +68,27 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'You cannot add yourself as a friend' });
     }
     
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(friendEmail)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+    
     console.log('Adding friend:', { friendEmail, userEmail, userId: req.user._id });
 
     // Find friend by email
     console.log('🔍 Looking for friend with email:', friendEmail);
-    let friend = await User.findOne({ email: friendEmail });
-    let nameFromEmail = friendEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const friend = await User.findOne({ email: friendEmail });
     
     if (!friend) {
-      // Friend doesn't exist - just send invitation email (no auto-creation)
-      console.log('📝 Friend not found. Sending invitation to sign up.');
-      nameFromEmail = nameFromEmail || 'Friend';
+      // Friend doesn't exist - send invitation email to sign up
+      console.log('📝 Friend not found. Sending invitation email to sign up.');
+      const nameFromEmail = friendEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).trim() || 'Friend';
       
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(friendEmail)) {
-        return res.status(400).json({ message: 'Invalid email format' });
-      }
-      
-      // Send invitation email (friend will sign up themselves)
+      // Send invitation email (non-blocking - friend will sign up themselves)
       try {
         const { sendInvitationEmail } = require('../services/email');
-        const emailResult = await sendInvitationEmail(friendEmail, nameFromEmail, req.user.name, false);
+        const emailResult = await sendInvitationEmail(friendEmail, nameFromEmail, req.user.name || 'A friend', false);
         if (emailResult.success) {
           console.log('✅ Invitation email sent to:', friendEmail);
         } else {
@@ -103,14 +102,11 @@ router.post('/', auth, async (req, res) => {
         message: 'Invitation sent! Your friend will receive an email to sign up. Once they sign up, you can add them again.',
         friends: [] // No friend added yet
       });
-    } else {
-      // Friend exists - use their name and add them
-      nameFromEmail = friend.name;
-      console.log('✅ Friend already exists:', friend._id);
     }
     
-    // Get user and check if already friends BEFORE sending email
-    // This ensures friend is added even if email fails
+    console.log('✅ Friend found:', friend._id);
+
+    // Get user and check if already friends
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -129,30 +125,26 @@ router.post('/', auth, async (req, res) => {
     await user.save();
     console.log('✅ Friend added to user list:', friend._id);
 
-    // Now send invitation/notification email (non-blocking)
+    // Send notification email (non-blocking)
     try {
       const { sendInvitationEmail } = require('../services/email');
-      const emailResult = await sendInvitationEmail(friendEmail, nameFromEmail, req.user.name, isNewUser ? tempPassword : null);
+      const emailResult = await sendInvitationEmail(friendEmail, friend.name, req.user.name || 'A friend', true);
       if (emailResult.success) {
-        console.log('✅ Invitation email sent to:', friendEmail);
+        console.log('✅ Notification email sent to:', friendEmail);
       } else {
-        console.log('⚠️ Email invitation failed (non-critical):', emailResult.message);
-        console.log('   Friend was still added successfully. Email details logged above.');
-        // Friend is already added, so continue
+        console.log('⚠️ Email notification failed (non-critical):', emailResult.message);
+        console.log('   Friend was still added successfully.');
       }
     } catch (emailError) {
-      console.log('⚠️ Email invitation error (non-critical):', emailError.message);
-      console.log('   Friend was still added successfully. Email details logged above.');
-      // Continue - friend is already added
+      console.log('⚠️ Email notification error (non-critical):', emailError.message);
+      console.log('   Friend was still added successfully.');
     }
 
     // Populate and return friends list
     await user.populate('friends', 'name email');
     console.log('📋 Returning friends list with', user.friends.length, 'friends');
     res.json({ 
-      message: isNewUser 
-        ? 'Friend invited and added! They will receive an email with login details and signup link.' 
-        : 'Friend added successfully! They will receive an email notification.',
+      message: 'Friend added successfully! They will receive an email notification.',
       friends: user.friends 
     });
   } catch (error) {
@@ -167,9 +159,10 @@ router.post('/', auth, async (req, res) => {
     
     // Provide more specific error messages
     if (error.code === 11000) {
-      // Duplicate key error - friend might have been created between our check and save
+      // Duplicate key error - friend might have been added between our check and save
       // Try to find and add them anyway
       try {
+        const friendEmail = req.body.email?.trim().toLowerCase();
         const existingFriend = await User.findOne({ email: friendEmail });
         if (existingFriend) {
           const user = await User.findById(req.user._id);
@@ -181,10 +174,10 @@ router.post('/', auth, async (req, res) => {
               user.friends.push(existingFriend._id);
               await user.save();
               
-              // Send email notification
+              // Send notification email (non-blocking)
               try {
                 const { sendInvitationEmail } = require('../services/email');
-                await sendInvitationEmail(friendEmail, existingFriend.name, req.user.name, null);
+                await sendInvitationEmail(friendEmail, existingFriend.name, req.user.name || 'A friend', true);
               } catch (emailError) {
                 console.log('Email failed (non-critical):', emailError.message);
               }
