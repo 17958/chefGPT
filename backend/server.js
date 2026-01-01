@@ -7,7 +7,8 @@
 // Step 1: Load environment variables from .env file
 // Environment variables are like secret settings stored in a .env file
 // Examples: database password, API keys, etc.
-require('dotenv').config();
+// { path: __dirname + '/.env' } ensures it loads from backend folder, not root
+require('dotenv').config({ path: __dirname + '/.env' });
 
 // Step 2: Import required libraries (like importing tools)
 // express - helps us create a web server (like building a restaurant)

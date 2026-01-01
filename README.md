@@ -1,6 +1,6 @@
 # ChefGPT Restaurant 🍽️
 
-AI-Powered Restaurant Ordering System with Razorpay Payment Integration
+AI-Powered Restaurant Ordering System with UPI QR Code Payments
 
 ## 🚀 Quick Start
 
@@ -10,14 +10,39 @@ AI-Powered Restaurant Ordering System with Razorpay Payment Integration
    ```bash
    npm run install:all
    ```
+   Or manually:
+   ```bash
+   cd backend && npm install
+   cd ../frontend && npm install
+   ```
 
 2. **Set up environment variables**:
-   - Backend: Create `backend/.env` with MongoDB URI, JWT_SECRET, etc.
-   - Frontend: Create `frontend/.env` with `REACT_APP_API_URL=http://localhost:5000`
+
+   **Backend** - Create `backend/.env`:
+   ```env
+   MONGODB_URI=mongodb://localhost:27017/amma-chethi-vanta
+   JWT_SECRET=your-random-secret-key-here
+   FRONTEND_URL=http://localhost:3000
+   UPI_ID=yourname@paytm
+   MERCHANT_NAME=ChefGPT
+   ```
+
+   **Frontend** - Create `frontend/.env`:
+   ```env
+   REACT_APP_API_URL=http://localhost:5000
+   ```
 
 3. **Run both frontend and backend**:
    ```bash
    npm run raju
+   ```
+   Or run separately:
+   ```bash
+   # Terminal 1 - Backend
+   cd backend && npm run dev
+   
+   # Terminal 2 - Frontend
+   cd frontend && npm start
    ```
 
 4. **Seed menu items** (first time only):
@@ -30,51 +55,125 @@ AI-Powered Restaurant Ordering System with Razorpay Payment Integration
 
 ### Frontend (Vercel)
 
-1. Install Vercel CLI: `npm install -g vercel`
-2. Deploy: `cd frontend && vercel`
-3. Add environment variable: `REACT_APP_API_URL` = your backend URL
+1. Go to https://vercel.com and sign up with GitHub
+2. Click "Add New Project"
+3. Import your GitHub repository
+4. Configure:
+   - **Root Directory**: `frontend`
+   - **Framework Preset**: Create React App
+5. Add Environment Variable:
+   - `REACT_APP_API_URL` = your Railway backend URL (e.g., `https://your-app.railway.app`)
+6. Click "Deploy"
+7. Copy your Vercel URL (e.g., `https://your-app.vercel.app`)
 
-### Backend (Railway/Render)
+### Backend (Railway)
 
-1. **Railway**: https://railway.app
-   - Connect GitHub repo
-   - Set root directory: `backend`
-   - Add environment variables
+1. Go to https://railway.app and sign up with GitHub
+2. Click "New Project" → "Deploy from GitHub repo"
+3. Select your repository
+4. Click on the service → Settings → Set **Root Directory** to `backend`
+5. Go to **Variables** tab and add:
+   ```env
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database
+   JWT_SECRET=your-random-secret-key
+   FRONTEND_URL=https://your-frontend.vercel.app
+   UPI_ID=yourname@paytm
+   MERCHANT_NAME=ChefGPT
+   NODE_ENV=production
+   ```
+6. Railway will auto-deploy
+7. Copy your Railway URL (e.g., `https://your-app.railway.app`)
 
-2. **Render**: https://render.com
-   - New Web Service
-   - Root: `backend`
-   - Build: `npm install`
-   - Start: `npm start`
+### Update Frontend After Backend Deployment
 
-See `DEPLOYMENT.md` for detailed instructions.
+1. Go back to Vercel Dashboard
+2. Settings → Environment Variables
+3. Update `REACT_APP_API_URL` to your Railway URL
+4. Redeploy (Vercel will rebuild automatically)
 
 ## 🔧 Environment Variables
 
-### Backend
-- `MONGODB_URI` - MongoDB connection string
-- `JWT_SECRET` - JWT token secret
-- `RAZORPAY_KEY_ID` - Razorpay API key
-- `RAZORPAY_KEY_SECRET` - Razorpay API secret
-- `FRONTEND_URL` - Frontend deployment URL
-- `PORT` - Server port (default: 5000)
+### Backend (`.env` file in `backend/` folder)
 
-### Frontend
-- `REACT_APP_API_URL` - Backend API URL
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `MONGODB_URI` | ✅ Yes | MongoDB connection string | `mongodb+srv://user:pass@cluster.mongodb.net/db` |
+| `JWT_SECRET` | ✅ Yes | Secret key for JWT tokens (min 32 chars) | Generate with: `openssl rand -base64 32` |
+| `FRONTEND_URL` | ✅ Yes | Your Vercel frontend URL | `https://your-app.vercel.app` |
+| `UPI_ID` | ✅ Yes | UPI ID for QR code payments | `merchant@paytm` or `merchant@phonepe` |
+| `MERCHANT_NAME` | ❌ No | Merchant name (default: ChefGPT) | `ChefGPT` |
+| `PORT` | ❌ No | Server port (Railway auto-assigns) | `5000` |
+| `NODE_ENV` | ❌ No | Environment mode | `production` |
+| `ADMIN_EMAIL` | ❌ No | Email for order notifications | `admin@example.com` |
+| `SMTP_HOST` | ❌ No | SMTP server (default: smtp.gmail.com) | `smtp.gmail.com` |
+| `SMTP_PORT` | ❌ No | SMTP port (default: 587) | `587` |
+| `SMTP_USER` | ❌ No | SMTP username | `your-email@gmail.com` |
+| `SMTP_PASSWORD` | ❌ No | SMTP password (Gmail App Password) | `your-app-password` |
+| `ADMIN_PHONE` | ❌ No | Phone for WhatsApp notifications | `+919876543210` |
+| `WHATSAPP_API_KEY` | ❌ No | WhatsApp API key | `your-api-key` |
+
+### Frontend (Vercel Environment Variables)
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `REACT_APP_API_URL` | ✅ Yes | Backend API URL | `http://localhost:5000` (local) or `https://your-backend.railway.app` (production) |
+| `REACT_APP_MERCHANT_NAME` | ❌ No | Merchant name | `ChefGPT` |
+
+**Important**: Frontend variables MUST start with `REACT_APP_` prefix!
 
 ## 📝 Features
 
-- ✅ User authentication (mobile number)
-- ✅ Menu browsing
+- ✅ User authentication (mobile number based)
+- ✅ Menu browsing with categories
 - ✅ Shopping cart with persistence
-- ✅ Razorpay payment integration
-- ✅ Order management
-- ✅ Google-style UI design
+- ✅ UPI QR code payment integration
+- ✅ Order management and tracking
+- ✅ Email notifications (optional)
+- ✅ WhatsApp notifications (optional)
+- ✅ Modern, responsive UI
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React, React Router, Axios
+- **Frontend**: React, React Router, Axios, QRCode React
 - **Backend**: Node.js, Express, MongoDB, Mongoose
-- **Payment**: Razorpay
-- **Authentication**: JWT
+- **Payment**: UPI QR Code
+- **Authentication**: JWT (JSON Web Tokens)
+- **Email**: Nodemailer (SMTP)
+- **Database**: MongoDB Atlas
+
+## 📚 Project Structure
+
+```
+chefGPT/
+├── backend/          # Node.js/Express API
+│   ├── models/       # Database models
+│   ├── routes/       # API routes
+│   ├── services/     # Email, WhatsApp services
+│   ├── middleware/   # Auth middleware
+│   └── server.js     # Main server file
+├── frontend/         # React app
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── pages/      # Page components
+│   │   └── context/    # React Context (Auth)
+│   └── public/
+└── package.json      # Root package.json (for local dev convenience)
+```
+
+## 🔑 Getting Started with MongoDB
+
+1. Go to https://www.mongodb.com/cloud/atlas
+2. Sign up (free tier available)
+3. Create a cluster (free M0)
+4. Click "Connect" → "Connect your application"
+5. Copy connection string
+6. Replace `<password>` with your database password
+7. Add to `backend/.env` as `MONGODB_URI`
+
+## 💡 Tips
+
+- **Root package.json**: Only needed for local development convenience (`npm run raju`). Vercel and Railway don't use it - they use `frontend/package.json` and `backend/package.json` directly.
+- **Environment Variables**: Backend uses `.env` file, Frontend uses Vercel's environment variables (set in dashboard).
+- **JWT Secret**: Generate a strong secret: `openssl rand -base64 32`
+- **Gmail SMTP**: You need to create an "App Password" in Google Account settings (not your regular password)
 

@@ -132,14 +132,24 @@ router.post('/auth', async (req, res) => {
     });
   } catch (error) {
     console.error('Auth error:', error);
+    console.error('Auth error details:', {
+      message: error.message,
+      code: error.code,
+      name: error.name,
+      stack: error.stack
+    });
     
     // If user already exists (duplicate phone number)
     if (error.code === 11000) {
       return res.status(409).json({ message: 'Already registered! Just sign in!' });
     }
     
-    // Any other error
-    res.status(500).json({ message: 'Oops! Something broke. Try again!' });
+    // Any other error - send more details in development
+    const errorMessage = process.env.NODE_ENV === 'production' 
+      ? 'Oops! Something broke. Try again!' 
+      : error.message || 'Oops! Something broke. Try again!';
+    
+    res.status(500).json({ message: errorMessage });
   }
 });
 

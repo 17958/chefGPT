@@ -67,9 +67,15 @@ export const AuthProvider = ({ children }) => {
       return { success: true, isNewUser };
     } catch (error) {
       console.error('Auth error:', error);
+      console.error('Auth error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
       return {
         success: false,
-        message: error.response?.data?.message || 'Authentication failed'
+        message: error.response?.data?.message || error.message || 'Authentication failed'
       };
     }
   };
