@@ -125,13 +125,12 @@ export const AuthProvider = ({ children }) => {
       
       // Check if we got an error response
       if (response.status >= 400) {
-        throw {
-          response: {
-            status: response.status,
-            data: response.data
-          },
-          message: response.data?.message || 'Registration failed'
+        const error = new Error(response.data?.message || 'Registration failed');
+        error.response = {
+          status: response.status,
+          data: response.data
         };
+        throw error;
       }
       const { token: newToken, user: userData } = response.data;
       setToken(newToken);
@@ -153,7 +152,7 @@ export const AuthProvider = ({ children }) => {
         const errorMessage = error.response?.data?.message || 'Email already registered. Please sign in!';
         return {
           success: false,
-          message: errorMessage + ' If this is your first time, the account might have been created when someone added you as a friend. Try signing in with the temporary password sent to your email, or contact support.',
+          message: errorMessage,
           suggestSignIn: true
         };
       } else if (error.response?.status === 400) {

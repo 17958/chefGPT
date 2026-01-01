@@ -77,12 +77,13 @@ router.post('/', auth, async (req, res) => {
     console.log('Adding friend:', { friendEmail, userEmail, userId: req.user._id });
 
     // Find friend by email
+    // IMPORTANT: We do NOT create users here - they must sign up first!
     console.log('🔍 Looking for friend with email:', friendEmail);
     const friend = await User.findOne({ email: friendEmail });
     
     if (!friend) {
-      // Friend doesn't exist - ask them to sign up first
-      console.log('📝 Friend not found. They need to sign up first.');
+      // Friend doesn't exist - they must sign up first (NO AUTO-CREATION)
+      console.log('📝 Friend not found. They need to sign up first. (No user will be created)');
       return res.status(404).json({ 
         message: 'Friend not found. Please ask your friend to sign up in ChefGPT first, then add them again.',
         friends: []
