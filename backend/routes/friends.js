@@ -70,23 +70,15 @@ router.post('/', auth, async (req, res) => {
     
     console.log('Adding friend:', { friendEmail, userEmail, userId: req.user._id });
 
-    // Find or create friend by email
+    // Find friend by email
     console.log('🔍 Looking for friend with email:', friendEmail);
     let friend = await User.findOne({ email: friendEmail });
-    let isNewUser = false;
-    let tempPassword = null;
     let nameFromEmail = friendEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     
     if (!friend) {
-      console.log('📝 Friend not found, creating new user...');
-      // Auto-onboard: Create new user with temporary password
-      isNewUser = true;
-      // Generate a secure temporary password (alphanumeric, no special chars that cause issues)
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      tempPassword = '';
-      for (let i = 0; i < 16; i++) {
-        tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
+      // Friend doesn't exist - just send invitation email (no auto-creation)
+      console.log('📝 Friend not found. Sending invitation to sign up.');
+      nameFromEmail = nameFromEmail || 'Friend';
       
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -94,115 +86,25 @@ router.post('/', auth, async (req, res) => {
         return res.status(400).json({ message: 'Invalid email format' });
       }
       
-      // Ensure name is valid
-      if (!nameFromEmail || nameFromEmail.trim().length === 0) {
-        nameFromEmail = 'Friend';
+      // Send invitation email (friend will sign up themselves)
+      try {
+        const { sendInvitationEmail } = require('../services/email');
+        const emailResult = await sendInvitationEmail(friendEmail, nameFromEmail, req.user.name, false);
+        if (emailResult.success) {
+          console.log('✅ Invitation email sent to:', friendEmail);
+        } else {
+          console.log('⚠️ Email invitation failed (non-critical):', emailResult.message);
+        }
+      } catch (emailError) {
+        console.log('⚠️ Email invitation error (non-critical):', emailError.message);
       }
       
-      try {
-        friend = new User({
-          name: nameFromEmail.trim(),
-          email: friendEmail,
-          password: tempPassword, // Will be hashed by pre-save hook
-          isAutoCreated: true, // Mark as auto-created so they can complete registration
-          friends: []
-        });
-        
-        // Explicitly set phone to undefined (not null) to avoid unique index conflicts
-        // MongoDB unique indexes on optional fields can cause issues with null values
-        friend.phone = undefined;
-        
-        // Validate before saving
-        const validationError = friend.validateSync();
-        if (validationError) {
-          console.error('Validation error:', validationError);
-          return res.status(400).json({ 
-            message: 'Invalid user data',
-            error: process.env.NODE_ENV === 'development' ? validationError.message : undefined
-          });
-        }
-        
-        await friend.save();
-        console.log('✅ New friend user created:', friend._id, friend.email);
-      } catch (createError) {
-        console.error('User creation error details:', {
-          code: createError.code,
-          name: createError.name,
-          message: createError.message,
-          email: friendEmail
-        });
-        
-        // If user creation fails (e.g., duplicate key), try to find the user again
-        if (createError.code === 11000 || createError.name === 'MongoServerError') {
-          const errorMessage = createError.message || '';
-          
-          // Check if it's a phone duplicate error (not email)
-          if (errorMessage.includes('phone_1') || errorMessage.includes('phone')) {
-            console.log('⚠️ Phone duplicate key error detected. Retrying without phone field...');
-            // Try creating again but explicitly omitting phone field
-            try {
-              friend = new User({
-                name: nameFromEmail.trim(),
-                email: friendEmail,
-                password: tempPassword,
-                isAutoCreated: true,
-                friends: []
-              });
-              // Explicitly set phone to undefined (not null) to avoid index conflict
-              friend.phone = undefined;
-              await friend.save();
-              console.log('✅ New friend user created (without phone):', friend._id);
-              isNewUser = true; // Keep as new user since we just created it
-            } catch (retryError) {
-              console.error('Retry creation also failed:', retryError.message);
-              // Fall through to email duplicate handling
-            }
-          }
-          
-          // If still not created, check if it's an email duplicate or try to find existing user
-          if (!friend) {
-            console.log('⚠️ Duplicate key error, finding existing user by email...');
-            // Wait a bit for race condition (user created between check and save)
-            await new Promise(resolve => setTimeout(resolve, 200));
-            friend = await User.findOne({ email: friendEmail });
-            
-            if (!friend) {
-              // Try one more time with a longer wait
-              await new Promise(resolve => setTimeout(resolve, 300));
-              friend = await User.findOne({ email: friendEmail });
-              
-              if (!friend) {
-                // Last resort: return a helpful error
-                console.error('❌ User creation failed and user not found after duplicate error');
-                return res.status(500).json({ 
-                  message: 'Unable to create or find user. The email might already be registered. Please try again.',
-                  error: process.env.NODE_ENV === 'development' ? createError.message : undefined
-                });
-              }
-            }
-            
-            isNewUser = false; // User already exists
-            nameFromEmail = friend.name || nameFromEmail;
-            console.log('✅ Friend already existed, found existing user:', friend._id);
-          }
-        } else if (createError.name === 'ValidationError') {
-          // Validation errors
-          const errors = Object.values(createError.errors || {}).map(e => e.message).join(', ');
-          return res.status(400).json({ 
-            message: `Validation error: ${errors}`,
-            error: process.env.NODE_ENV === 'development' ? createError.message : undefined
-          });
-        } else {
-          // Other database errors
-          console.error('Unexpected user creation error:', createError);
-          return res.status(500).json({ 
-            message: 'Failed to create user account. Please try again.',
-            error: process.env.NODE_ENV === 'development' ? createError.message : undefined
-          });
-        }
-      }
+      return res.json({ 
+        message: 'Invitation sent! Your friend will receive an email to sign up. Once they sign up, you can add them again.',
+        friends: [] // No friend added yet
+      });
     } else {
-      // Friend already exists - use their name
+      // Friend exists - use their name and add them
       nameFromEmail = friend.name;
       console.log('✅ Friend already exists:', friend._id);
     }

@@ -8,7 +8,6 @@ const AuthPage = () => {
   // Separate state for signin and signup forms
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
-  const [signUpName, setSignUpName] = useState('');
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
   // Separate error states for each form
@@ -114,16 +113,11 @@ const AuthPage = () => {
       return;
     }
     
-    if (!signUpName.trim()) {
-      setSignUpError('Please enter your name');
-      return;
-    }
-    
     setLoading(true);
 
     try {
-      console.log('Attempting signup with:', { email: signUpEmail.trim(), name: signUpName.trim() });
-      const result = await register(signUpEmail.trim(), signUpName.trim(), signUpPassword);
+      console.log('Attempting signup with:', { email: signUpEmail.trim() });
+      const result = await register(signUpEmail.trim(), signUpPassword);
       console.log('Signup result:', result);
       
       if (result.success) {
@@ -314,26 +308,6 @@ const AuthPage = () => {
           >
             {signUpError && <div className="error-message">{signUpError}</div>}
             
-            <div className="form-group">
-              <label htmlFor="signup-name">Name</label>
-              <input
-                type="text"
-                id="signup-name"
-                value={signUpName}
-                onChange={(e) => {
-                  if (!isSignIn) {
-                    setSignUpName(e.target.value);
-                  }
-                }}
-                required
-                placeholder="Enter your name"
-                disabled={loading || isSignIn}
-                readOnly={isSignIn}
-                onClick={(e) => e.stopPropagation()}
-                onFocus={(e) => e.stopPropagation()}
-              />
-            </div>
-
             <div className="form-group">
               <label htmlFor="signup-email">Email</label>
               <input

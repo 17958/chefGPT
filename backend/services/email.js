@@ -159,15 +159,14 @@ ChefGPT Restaurant
 }
 
 /**
- * Send invitation email to new user (free onboarding)
+ * Send invitation email to friend
  * @param {string} friendEmail - Email of the friend being invited
  * @param {string} friendName - Name of the friend
  * @param {string} inviterName - Name of person who invited them
- * @param {string} tempPassword - Temporary password for login (null if existing user)
+ * @param {boolean} isExistingUser - true if friend already has account, false if new user
  * @returns {object} - { success: true/false, message: '...' }
  */
-async function sendInvitationEmail(friendEmail, friendName, inviterName, tempPassword) {
-  const isExistingUser = !tempPassword;
+async function sendInvitationEmail(friendEmail, friendName, inviterName, isExistingUser) {
   const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
   const smtpPort = process.env.SMTP_PORT || 587;
   const smtpUser = process.env.SMTP_USER;
@@ -185,10 +184,8 @@ async function sendInvitationEmail(friendEmail, friendName, inviterName, tempPas
     } else {
       console.log('Subject: Welcome to ChefGPT!');
       console.log(`Body: Hi ${friendName}, ${inviterName} invited you to ChefGPT!`);
-      console.log(`Smart link: ${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}`);
-      console.log(`Email: ${friendEmail}`);
-      console.log(`Temporary Password: ${tempPassword}`);
-      console.log('Complete registration by signing up with your own password.');
+      console.log(`Sign up link: ${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}`);
+      console.log('They need to sign up with their email and create a password.');
     }
     console.log('==========================================\n');
     return { success: true, message: 'Invitation logged (SMTP not configured)' };
@@ -244,15 +241,13 @@ async function sendInvitationEmail(friendEmail, friendName, inviterName, tempPas
           <p><strong>${inviterName}</strong> invited you to join ChefGPT - an AI-powered restaurant platform with real-time chat!</p>
           
           <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
-            <p style="margin: 0 0 10px 0;"><strong>📧 Your Account Details:</strong></p>
-            <p style="margin: 5px 0;"><strong>Email:</strong> ${friendEmail}</p>
-            <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 14px;">${tempPassword}</code></p>
-            <p style="color: #d32f2f; font-size: 14px; margin: 10px 0 0 0; font-weight: bold;">⚠️ Important: Complete your registration by signing up with your own password!</p>
+            <p style="margin: 0 0 10px 0;"><strong>📧 Get Started:</strong></p>
+            <p style="margin: 5px 0;">Sign up with your email and create your password to join ChefGPT!</p>
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-              Get Started →
+              Sign Up Now →
             </a>
           </div>
           
@@ -261,7 +256,7 @@ async function sendInvitationEmail(friendEmail, friendName, inviterName, tempPas
             <ol style="margin: 10px 0 0 20px; padding: 0; font-size: 14px; color: #424242;">
               <li>Click the button above to go to the signup page</li>
               <li>Your email will be pre-filled</li>
-              <li>Enter your name and choose a new password</li>
+              <li>Enter your name and create a password</li>
               <li>Start chatting with ${inviterName} and ordering delicious food!</li>
             </ol>
           </div>
@@ -307,10 +302,7 @@ async function sendInvitationEmail(friendEmail, friendName, inviterName, tempPas
     // Log email details even if sending fails (so you can manually send)
     console.log('\n=== INVITATION EMAIL (Failed to send - Manual action needed) ===');
     console.log('To:', friendEmail);
-    if (tempPassword) {
-      console.log(`Temporary Password: ${tempPassword}`);
-    }
-    console.log(`Smart link: ${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}`);
+    console.log(`Sign up link: ${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}`);
     console.log('==========================================\n');
     
     return { 

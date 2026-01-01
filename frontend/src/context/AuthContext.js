@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (email, name, password) => {
+  const register = async (email, password) => {
     try {
       // Check if already logged in
       if (token && user) {
@@ -100,13 +100,6 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
-      if (!name || !name.trim()) {
-        return {
-          success: false,
-          message: 'Please enter your name'
-        };
-      }
-
       if (!password || password.length < 6) {
         return {
           success: false,
@@ -115,11 +108,10 @@ export const AuthProvider = ({ children }) => {
       }
 
       const signupUrl = `${API_URL}/api/auth/signup`;
-      console.log('Registering user with:', { email: email.trim(), name: name.trim(), url: signupUrl });
+      console.log('Registering user with:', { email: email.trim(), url: signupUrl });
       
       const response = await axios.post(signupUrl, {
         email: email.trim(),
-        name: name.trim(),
         password: password
       }, {
         validateStatus: function (status) {

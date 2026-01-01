@@ -76,7 +76,6 @@ router.post('/auth', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        phone: user.phone || null
       }
     });
   } catch (error) {
@@ -92,15 +91,11 @@ router.post('/auth', async (req, res) => {
 
 router.post('/signup', async (req, res) => {
   try {
-    console.log('Signup request received:', { email: req.body.email, hasName: !!req.body.name });
-    const { email, name, password } = req.body;
+    console.log('Signup request received:', { email: req.body.email });
+    const { email, password } = req.body;
 
     if (!email || !email.trim()) {
       return res.status(400).json({ message: 'Please enter your email' });
-    }
-    
-    if (!name || !name.trim()) {
-      return res.status(400).json({ message: 'Please enter your name' });
     }
 
     if (!password || password.length < 6) {
@@ -108,42 +103,36 @@ router.post('/signup', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const cleanName = name.trim();
+    
+    // Generate name from email (e.g., "john.doe@example.com" -> "John Doe")
+    const nameFromEmail = cleanEmail.split('@')[0]
+      .replace(/[^a-zA-Z0-9]/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase())
+      .trim() || 'User';
     
     console.log('Processing signup for:', cleanEmail);
 
     // Check if user already exists
-    let user = await User.findOne({ email: cleanEmail });
+    const existingUser = await User.findOne({ email: cleanEmail });
     
-    if (user) {
-      // If user was auto-created (invited by friend), allow them to complete registration
-      if (user.isAutoCreated === true) {
-        // Update user with new password and mark as completed
-        user.name = cleanName;
-        user.password = password; // Will be hashed by pre-save hook
-        user.isAutoCreated = false;
-        await user.save();
-        console.log(`User ${cleanEmail} completed registration (was auto-created)`);
-      } else {
-        // User exists and is fully registered
-        console.log(`Signup attempt for existing user: ${cleanEmail} (isAutoCreated: ${user.isAutoCreated})`);
-        return res.status(409).json({ 
-          message: 'Email already registered. Please sign in! If you forgot your password, try signing in first or contact support.',
-          canCompleteRegistration: false
-        });
+    if (existingUser) {
+      // User already exists
+      console.log(`Signup attempt for existing user: ${cleanEmail}`);
+      return res.status(409).json({ 
+        message: 'Email already registered. Please sign in!',
+        suggestSignIn: true
+      });
     }
-    } else {
-      // Create new user (password will be hashed by pre-save hook)
-      user = new User({ 
-      name: cleanName, 
+    
+    // Create new user (password will be hashed by pre-save hook)
+    const user = new User({ 
+      name: nameFromEmail, 
       email: cleanEmail,
-        password: password,
-        isAutoCreated: false,
+      password: password,
       friends: []
     });
     await user.save();
-      console.log(`New user created: ${cleanEmail}`);
-    }
+    console.log(`New user created: ${cleanEmail}`);
 
     // Create JWT token
     const token = jwt.sign(
@@ -158,7 +147,6 @@ router.post('/signup', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        phone: user.phone || null
       }
     });
   } catch (error) {
@@ -171,37 +159,11 @@ router.post('/signup', async (req, res) => {
     });
     
     if (error.code === 11000) {
-      // Duplicate key error (email already exists) - MongoDB unique constraint
-      // Try to find the user and check if they're auto-created
-      try {
-        const existingUser = await User.findOne({ email: cleanEmail });
-        if (existingUser && existingUser.isAutoCreated) {
-          // Allow them to complete registration
-          existingUser.name = cleanName;
-          existingUser.password = password;
-          existingUser.isAutoCreated = false;
-          await existingUser.save();
-          
-          const token = jwt.sign(
-            { userId: existingUser._id },
-            process.env.JWT_SECRET || 'fallback-secret',
-            { expiresIn: '7d' }
-          );
-          
-          return res.json({
-            token,
-            user: {
-              id: existingUser._id,
-              name: existingUser.name,
-              email: existingUser.email,
-              phone: existingUser.phone || null
-            }
-          });
-        }
-      } catch (e) {
-        console.error('Error handling duplicate:', e);
-      }
-      return res.status(409).json({ message: 'Email already registered. Please sign in!' });
+      // Duplicate key error (email already exists)
+      return res.status(409).json({ 
+        message: 'Email already registered. Please sign in!',
+        suggestSignIn: true
+      });
     }
     
     // Return proper error message for signup
@@ -232,26 +194,14 @@ router.get('/check-email/:email', async (req, res) => {
       // User doesn't exist - should sign up
       return res.json({
         exists: false,
-        isAutoCreated: false,
         shouldSignUp: true,
         redirectTo: 'signup'
       });
     }
     
-    if (user.isAutoCreated === true) {
-      // User exists but is auto-created - should complete signup
-      return res.json({
-        exists: true,
-        isAutoCreated: true,
-        shouldSignUp: true,
-        redirectTo: 'signup'
-      });
-    }
-    
-    // User exists and is fully registered - should sign in
+    // User exists - should sign in
     return res.json({
       exists: true,
-      isAutoCreated: false,
       shouldSignUp: false,
       redirectTo: 'signin'
     });
@@ -275,7 +225,6 @@ router.get('/me', auth, async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        phone: user.phone || null,
         friends: user.friends || []
       }
     });
