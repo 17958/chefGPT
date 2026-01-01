@@ -1,11 +1,19 @@
-// Script to drop the unique index on phone field if it exists
-// This fixes the "E11000 duplicate key error collection: test.yumsters index: phone_1" error
+// Script to drop the unique index on phone field in production database
+// Run this on Railway or your production server to fix the E11000 duplicate key error
 const mongoose = require('mongoose');
 require('dotenv').config();
 
 async function fixPhoneIndex() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/test', {
+    const mongoUri = process.env.MONGODB_URI;
+    
+    if (!mongoUri) {
+      console.error('❌ MONGODB_URI not found in environment variables');
+      process.exit(1);
+    }
+
+    console.log('🔌 Connecting to MongoDB...');
+    await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
@@ -41,7 +49,7 @@ async function fixPhoneIndex() {
     });
 
     await mongoose.disconnect();
-    console.log('\n✅ Done!');
+    console.log('\n✅ Done! Phone index issue fixed.');
     process.exit(0);
   } catch (error) {
     console.error('❌ Error:', error);

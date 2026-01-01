@@ -20,10 +20,6 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
-  isAutoCreated: {
-    type: Boolean,
-    default: false
-  },
   friends: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'

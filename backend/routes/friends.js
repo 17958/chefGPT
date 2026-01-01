@@ -81,26 +81,11 @@ router.post('/', auth, async (req, res) => {
     const friend = await User.findOne({ email: friendEmail });
     
     if (!friend) {
-      // Friend doesn't exist - send invitation email to sign up
-      console.log('📝 Friend not found. Sending invitation email to sign up.');
-      const nameFromEmail = friendEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).trim() || 'Friend';
-      
-      // Send invitation email (non-blocking - friend will sign up themselves)
-      try {
-        const { sendInvitationEmail } = require('../services/email');
-        const emailResult = await sendInvitationEmail(friendEmail, nameFromEmail, req.user.name || 'A friend', false);
-        if (emailResult.success) {
-          console.log('✅ Invitation email sent to:', friendEmail);
-        } else {
-          console.log('⚠️ Email invitation failed (non-critical):', emailResult.message);
-        }
-      } catch (emailError) {
-        console.log('⚠️ Email invitation error (non-critical):', emailError.message);
-      }
-      
-      return res.json({ 
-        message: 'Invitation sent! Your friend will receive an email to sign up. Once they sign up, you can add them again.',
-        friends: [] // No friend added yet
+      // Friend doesn't exist - ask them to sign up first
+      console.log('📝 Friend not found. They need to sign up first.');
+      return res.status(404).json({ 
+        message: 'Friend not found. Please ask your friend to sign up in ChefGPT first, then add them again.',
+        friends: []
       });
     }
     
@@ -120,31 +105,16 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Already friends with this user' });
     }
 
-    // Add friend FIRST (before email, so friend is added even if email fails)
+    // Add friend
     user.friends.push(friend._id);
     await user.save();
     console.log('✅ Friend added to user list:', friend._id);
-
-    // Send notification email (non-blocking)
-    try {
-      const { sendInvitationEmail } = require('../services/email');
-      const emailResult = await sendInvitationEmail(friendEmail, friend.name, req.user.name || 'A friend', true);
-      if (emailResult.success) {
-        console.log('✅ Notification email sent to:', friendEmail);
-      } else {
-        console.log('⚠️ Email notification failed (non-critical):', emailResult.message);
-        console.log('   Friend was still added successfully.');
-      }
-    } catch (emailError) {
-      console.log('⚠️ Email notification error (non-critical):', emailError.message);
-      console.log('   Friend was still added successfully.');
-    }
 
     // Populate and return friends list
     await user.populate('friends', 'name email');
     console.log('📋 Returning friends list with', user.friends.length, 'friends');
     res.json({ 
-      message: 'Friend added successfully! They will receive an email notification.',
+      message: 'Friend added successfully! You can now chat with them in real-time.',
       friends: user.friends 
     });
   } catch (error) {
@@ -174,17 +144,9 @@ router.post('/', auth, async (req, res) => {
               user.friends.push(existingFriend._id);
               await user.save();
               
-              // Send notification email (non-blocking)
-              try {
-                const { sendInvitationEmail } = require('../services/email');
-                await sendInvitationEmail(friendEmail, existingFriend.name, req.user.name || 'A friend', true);
-              } catch (emailError) {
-                console.log('Email failed (non-critical):', emailError.message);
-              }
-              
               await user.populate('friends', 'name email');
               return res.json({ 
-                message: 'Friend added successfully! They will receive an email notification.',
+                message: 'Friend added successfully! You can now chat with them in real-time.',
                 friends: user.friends 
               });
             } else {
