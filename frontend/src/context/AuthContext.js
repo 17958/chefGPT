@@ -64,6 +64,21 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token, fetchUser]);
 
+  // Handle page visibility changes (tab switching, etc.)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && token) {
+        // Refetch user when tab becomes visible to ensure token is still valid
+        fetchUser();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [token, fetchUser]);
+
   const login = async (email, password) => {
     try {
       // Validate before sending
