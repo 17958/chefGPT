@@ -197,10 +197,15 @@ router.post('/', auth, async (req, res) => {
     // Always send invitation/notification email (whether new or existing)
     try {
       const { sendInvitationEmail } = require('../services/email');
-      await sendInvitationEmail(friendEmail, nameFromEmail, req.user.name, isNewUser ? tempPassword : null);
-      console.log('✅ Invitation email sent to:', friendEmail);
+      const emailResult = await sendInvitationEmail(friendEmail, nameFromEmail, req.user.name, isNewUser ? tempPassword : null);
+      if (emailResult.success) {
+        console.log('✅ Invitation email sent to:', friendEmail);
+      } else {
+        console.log('⚠️ Email invitation failed (non-critical):', emailResult.message);
+        // Friend is still added even if email fails
+      }
     } catch (emailError) {
-      console.log('⚠️ Email invitation failed (non-critical):', emailError.message);
+      console.log('⚠️ Email invitation error (non-critical):', emailError.message);
       // Continue even if email fails - friend is still added
     }
 

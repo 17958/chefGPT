@@ -202,7 +202,13 @@ async function sendInvitationEmail(friendEmail, friendName, inviterName, tempPas
       auth: {
         user: smtpUser,
         pass: smtpPass
-      }
+      },
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000, // 10 seconds
+      socketTimeout: 10000, // 10 seconds
+      pool: true, // Use connection pooling
+      maxConnections: 1,
+      maxMessages: 3
     });
 
     const emailSubject = isExistingUser 
@@ -267,23 +273,51 @@ async function sendInvitationEmail(friendEmail, friendName, inviterName, tempPas
         </div>
       `;
 
-    const info = await transporter.sendMail({
+    // Try sending with timeout handling
+    const sendPromise = transporter.sendMail({
       from: `"ChefGPT" <${smtpUser}>`,
       to: friendEmail,
       subject: emailSubject,
       html: emailContent
     });
 
-    console.log('Invitation email sent:', info.messageId);
+    // Add timeout wrapper
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Email send timeout after 15 seconds')), 15000);
+    });
+
+    const info = await Promise.race([sendPromise, timeoutPromise]);
+
+    console.log('✅ Invitation email sent:', info.messageId);
     return { success: true, message: 'Invitation email sent' };
   } catch (error) {
-    console.error('Invitation email error:', error);
-    // Log even if sending fails
-    console.log('\n=== INVITATION EMAIL (Failed to send) ===');
+    console.error('❌ Invitation email error:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error command:', error.command);
+    
+    // Check for specific timeout errors
+    if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+      console.error('⚠️ SMTP connection timeout - This might be due to:');
+      console.error('   1. Railway blocking outbound SMTP connections');
+      console.error('   2. Gmail SMTP being blocked by firewall');
+      console.error('   3. Network connectivity issues');
+      console.error('   Solution: Consider using SendGrid, Mailgun, or AWS SES for production');
+    }
+    
+    // Log email details even if sending fails (so you can manually send)
+    console.log('\n=== INVITATION EMAIL (Failed to send - Manual action needed) ===');
     console.log('To:', friendEmail);
-    console.log(`Temporary Password: ${tempPassword}`);
+    if (tempPassword) {
+      console.log(`Temporary Password: ${tempPassword}`);
+    }
+    console.log(`Smart link: ${frontendUrl}/auth?email=${encodeURIComponent(friendEmail)}`);
     console.log('==========================================\n');
-    return { success: false, message: 'Failed to send invitation email' };
+    
+    return { 
+      success: false, 
+      message: 'Failed to send invitation email. Please check logs for details.',
+      error: error.message
+    };
   }
 }
 
