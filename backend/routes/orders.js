@@ -78,7 +78,7 @@ router.post('/', auth, async (req, res) => {
       orderType, // "take-away" or "dine-in"
       totalAmount, // Total price
       customerName: req.user.name, // Customer name
-      customerPhone: req.user.phone, // Customer phone
+      customerPhone: '', // Phone not collected (removed from user model)
       customerEmail: req.user.email, // Customer email
       paymentStatus: 'pending' // Payment not verified yet
     });
