@@ -55,17 +55,32 @@ async function getAIResponse(prompt, context = '@bro', chatHistory = []) {
       return "Hey! Your GEMINI_API_KEY appears to be invalid. Please check your API key format. Get a new key at https://makersuite.google.com/app/apikey";
     }
 
-    console.log('✅ GEMINI_API_KEY found, using fastest model...');
+    console.log('✅ GEMINI_API_KEY found, trying available models...');
 
-    // Skip model listing for speed - use fastest models directly
-    // Try fastest models first for better response time
-    const modelNames = [
-      'gemini-1.5-flash',     // Fastest and most reliable
-      'gemini-2.0-flash',     // Fast
-      'gemini-2.5-flash',     // Latest and fast
-      'gemini-1.5-pro',       // Slower but capable fallback
-      'gemini-pro'            // Legacy fallback
-    ];
+    // Try to get available models first, then fall back to known good models
+    let modelNames = [];
+    try {
+      const availableModels = await listAvailableModels();
+      if (availableModels && availableModels.length > 0) {
+        // Filter to only flash and pro models, prioritize flash
+        const flashModels = availableModels.filter(m => m.includes('flash'));
+        const proModels = availableModels.filter(m => m.includes('pro') && !m.includes('flash'));
+        modelNames = [...flashModels, ...proModels];
+        console.log(`✅ Found ${modelNames.length} available models:`, modelNames);
+      }
+    } catch (listError) {
+      console.log('⚠️ Could not list models, using fallback list');
+    }
+    
+    // Fallback to known good models if listing failed or returned empty
+    if (modelNames.length === 0) {
+      modelNames = [
+        'gemini-1.5-flash',     // Fastest and most reliable
+        'gemini-1.5-pro',       // Slower but capable fallback
+        'gemini-pro'            // Legacy fallback
+      ];
+      console.log('📋 Using fallback model list:', modelNames);
+    }
 
     let lastError = null;
     const identity = context === 'raja' ? 'Raja' : '@bro';
@@ -149,8 +164,14 @@ async function getAIResponse(prompt, context = '@bro', chatHistory = []) {
     }
 
     // If all models failed, log and throw
-    console.error('❌ All Gemini models failed. Last error:', lastError?.message);
-    throw lastError || new Error('All models failed');
+    console.error('❌ All Gemini models failed. Tried models:', modelNames);
+    console.error('❌ Last error:', lastError?.message);
+    console.error('❌ Error details:', {
+      message: lastError?.message,
+      status: lastError?.response?.status,
+      data: lastError?.response?.data
+    });
+    throw lastError || new Error(`All ${modelNames.length} models failed`);
   } catch (error) {
     console.error('❌ Gemini AI error:', error);
     console.error('Error details:', {
@@ -176,8 +197,8 @@ async function getAIResponse(prompt, context = '@bro', chatHistory = []) {
     }
     
     // Model not found errors
-    if (errorMessage.includes('404') || errorMessage.includes('not found') || errorStatus === 404) {
-      return "❌ Model not found. This might be a temporary issue. Please try again in a moment, or check if your API key has access to Gemini models.";
+    if (errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('Model not found') || errorStatus === 404) {
+      return "❌ Model not found. This might be a temporary issue. Please try again in a moment, or check if your API key has access to Gemini models. If the issue persists, verify your API key at https://makersuite.google.com/app/apikey";
     }
     
     // Quota exceeded
