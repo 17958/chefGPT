@@ -1,32 +1,15 @@
-// ============================================
-// MAIN SERVER FILE - This is where our app starts
-// ============================================
-// Think of this file as the "main door" of a restaurant
-// All requests come here first, then get directed to the right place
-
-// Step 1: Load environment variables from .env file
-// Environment variables are like secret settings stored in a .env file
-// Examples: database password, API keys, etc.
-// { path: __dirname + '/.env' } ensures it loads from backend folder, not root
 require('dotenv').config({ path: __dirname + '/.env' });
 
-// Step 2: Import required libraries (like importing tools)
-// express - helps us create a web server (like building a restaurant)
-// mongoose - helps us talk to MongoDB database (like talking to a storage room)
-// cors - allows frontend to talk to backend (like allowing customers to enter)
-// socket.io - enables real-time chat (like a walkie-talkie for instant messages)
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 
-// Step 3: Create our Express app and HTTP server
-// This creates a new web server (like opening a new restaurant)
 const app = express();
 const server = http.createServer(app);
 
-// Step 3.5: Setup Socket.io for real-time chat
+// Socket.io setup for real-time chat
 const io = new Server(server, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -35,33 +18,27 @@ const io = new Server(server, {
   }
 });
 
-// Store connected users
 const connectedUsers = new Map();
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // User joins with their user ID
   socket.on('join', (userId) => {
     connectedUsers.set(userId, socket.id);
     socket.userId = userId;
     console.log(`User ${userId} joined chat`);
   });
 
-  // Handle sending messages
   socket.on('sendMessage', async (data) => {
     try {
       const Message = require('./models/Message');
       const { getAIResponse } = require('./services/gemini');
       
       const { senderId, receiverId, content } = data;
-
-      // Check if message mentions @bro
       const isMentioningBro = content.toLowerCase().includes('@bro');
       
       if (isMentioningBro) {
-        // Remove @bro from prompt and get AI response
         const prompt = content.replace(/@bro\s*/gi, '').trim();
         if (!prompt) {
           socket.emit('error', { message: 'Please provide a question after @bro' });
@@ -70,7 +47,6 @@ io.on('connection', (socket) => {
         
         const aiResponse = await getAIResponse(prompt);
 
-        // Save user message (to the friend they're chatting with)
         const userMessage = new Message({
           sender: senderId,
           receiver: receiverId,
@@ -78,17 +54,14 @@ io.on('connection', (socket) => {
         });
         await userMessage.save();
 
-        // Save AI response in the same conversation
-        // Use receiverId as sender so it appears in the same chat thread
         const aiMessage = new Message({
-          sender: receiverId, // Appears as if from the friend (but marked as AI)
+          sender: receiverId,
           receiver: senderId,
           content: `🤖 @bro: ${aiResponse}`,
           isAIResponse: true
         });
         await aiMessage.save();
 
-        // Emit user message to receiver (if chatting with a friend)
         const receiverSocketId = connectedUsers.get(receiverId);
         if (receiverSocketId && receiverId !== senderId) {
           io.to(receiverSocketId).emit('newMessage', {
@@ -98,21 +71,18 @@ io.on('connection', (socket) => {
           });
         }
 
-        // Emit both messages to sender
         io.to(socket.id).emit('newMessage', {
           ...userMessage.toObject(),
           sender: { _id: senderId },
           receiver: { _id: receiverId }
         });
         
-        // Emit AI response to sender
         io.to(socket.id).emit('newMessage', {
           ...aiMessage.toObject(),
           sender: { _id: receiverId, name: '@bro', email: 'ai@chefgpt.com' },
           receiver: { _id: senderId }
         });
       } else {
-        // Regular message
         const message = new Message({
           sender: senderId,
           receiver: receiverId,
@@ -120,7 +90,6 @@ io.on('connection', (socket) => {
         });
         await message.save();
 
-        // Send to receiver if online
         const receiverSocketId = connectedUsers.get(receiverId);
         if (receiverSocketId) {
           io.to(receiverSocketId).emit('newMessage', {
@@ -130,7 +99,6 @@ io.on('connection', (socket) => {
           });
         }
 
-        // Send confirmation to sender
         socket.emit('messageSent', {
           ...message.toObject(),
           sender: { _id: senderId },
@@ -143,7 +111,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle disconnection
   socket.on('disconnect', () => {
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
@@ -152,170 +119,53 @@ io.on('connection', (socket) => {
   });
 });
 
-// Step 4: Handle OPTIONS requests (CORS preflight)
-// When frontend makes a request, browser first sends an OPTIONS request
-// This is like asking "Can I make this request?" before actually making it
-// We need to say "Yes, you can!" by sending proper headers
-app.use((req, res, next) => {
-  // Log every request for debugging (like a security camera recording)
-  console.log(`[REQUEST] ${req.method} ${req.url} - Origin: ${req.headers.origin || 'none'}`);
-  
-  // If it's an OPTIONS request (browser asking permission)
-  if (req.method === 'OPTIONS') {
-    console.log(`[OPTIONS HANDLER] Caught OPTIONS request for: ${req.url}`);
-    
-    // Get where the request is coming from
-    const origin = req.headers.origin;
-    
-    // List of allowed origins (who can access our API)
-    const allowedOrigins = [
-      'http://localhost:3000', // Local development (React app running on your computer)
-      process.env.FRONTEND_URL // Production frontend URL
-    ].filter(Boolean); // Remove any empty values
-    
-    console.log(`[OPTIONS HANDLER] Origin: ${origin}, Allowed: ${allowedOrigins.join(', ')}`);
-    
-    // Decide if we should allow this request
-    // Allow if: FRONTEND_URL not set (initial setup) OR origin is in allowed list OR not in production
-    const shouldAllow = !process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production';
-    
-    console.log(`[OPTIONS HANDLER] Should allow: ${shouldAllow}`);
-    
-    if (shouldAllow) {
-      // Say "Yes, you can make requests!" by setting these headers
-      res.header('Access-Control-Allow-Origin', origin || '*'); // Who can access
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH'); // What methods allowed
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With'); // What headers allowed
-      res.header('Access-Control-Allow-Credentials', 'true'); // Allow cookies
-      res.header('Access-Control-Max-Age', '86400'); // Cache this permission for 24 hours
-      console.log(`[OPTIONS HANDLER] Sending 200 OK for ${req.url}`);
-      return res.sendStatus(200); // Say "OK, you have permission!"
-    } else {
-      console.log(`[OPTIONS HANDLER] Sending 403 Forbidden for ${req.url}`);
-      return res.sendStatus(403); // Say "No, you don't have permission!"
-    }
-  }
-  next(); // Continue to next middleware
-});
-
-// Step 5: Setup CORS (Cross-Origin Resource Sharing)
-// CORS is like a bouncer at a club - decides who can enter
-// This allows our frontend (running on different port) to make requests to backend
+// CORS middleware
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // List of allowed origins
     const allowedOrigins = [
-      'http://localhost:3000', // Local React app
-      process.env.FRONTEND_URL // Production frontend
+      'http://localhost:3000',
+      process.env.FRONTEND_URL
     ].filter(Boolean);
     
-    // Decide if we should allow this origin
-    // Allow if: FRONTEND_URL not set OR origin is in allowed list OR not in production
     if (!process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-      callback(null, true); // Say "Yes, you're allowed!"
+      callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS')); // Say "No, you're not allowed!"
+      callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true, // Allow cookies to be sent
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], // What HTTP methods allowed
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'], // What headers allowed
-  preflightContinue: false, // Don't continue to next middleware for OPTIONS
-  optionsSuccessStatus: 200 // Success status for OPTIONS
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
-// Apply CORS middleware
 app.use(cors(corsOptions));
-
-// Step 6: Tell Express to understand JSON data
-// When frontend sends JSON data (like {"name": "John"}), Express will automatically convert it to JavaScript object
 app.use(express.json());
 
-// Step 7: Backup OPTIONS handler (in case first one doesn't catch it)
-app.options('*', (req, res) => {
-  console.log(`[OPTIONS BACKUP] Caught OPTIONS for: ${req.url}`);
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    process.env.FRONTEND_URL
-  ].filter(Boolean);
-  
-  const shouldAllow = !process.env.FRONTEND_URL || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production';
-  
-  if (shouldAllow) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    console.log(`[OPTIONS BACKUP] Sending 200 OK for ${req.url}`);
-    return res.sendStatus(200);
-  } else {
-    console.log(`[OPTIONS BACKUP] Sending 403 Forbidden for ${req.url}`);
-    return res.sendStatus(403);
-  }
-});
-
-// Step 8: Root route for health checks
-// This is like a heartbeat - tells us if server is alive
-// Railway (hosting platform) checks this to see if server is running
+// Health check
 app.get('/', (req, res) => {
-  // Respond immediately with "OK" (like saying "I'm alive!")
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('OK');
+  res.json({ status: 'OK', service: 'Chat API' });
 });
 
-// Step 9: Connect all our routes
-// Routes are like different pages/endpoints of our API
-// Think of routes as different rooms in a restaurant:
-// /api/auth - Login/Signup room
-// /api/menu - Menu items room
-// /api/orders - Orders room
-// /api/cart - Shopping cart room
-// /api/payments - Payment room
-try {
-  app.use('/api/auth', require('./routes/auth')); // Login and signup
-  app.use('/api/menu', require('./routes/menu')); // Get menu items
-  app.use('/api/orders', require('./routes/orders')); // Create and view orders
-  app.use('/api/cart', require('./routes/cart')); // Shopping cart
-  app.use('/api/payments', require('./routes/payments')); // Payment processing
-  // Pass io instance to friends route for socket notifications
-  const friendsRouter = require('./routes/friends');
-  friendsRouter.setIO(io); // Set io instance for friend request notifications
-  app.use('/api/friends', friendsRouter); // Friends management
-  app.use('/api/messages', require('./routes/messages')); // Get messages
-  console.log('✅ All routes loaded successfully');
-} catch (error) {
-  console.error('❌ Error loading routes:', error);
-  // Don't crash - server can still respond to health checks
-}
-
-// Step 10: Log all registered routes (for debugging)
-console.log('Registered routes:');
-console.log('  GET/POST /api/auth/*');
-console.log('  GET /api/menu');
-console.log('  POST/GET /api/orders');
-console.log('  GET/POST/DELETE /api/cart');
-console.log('  POST /api/payments/*');
-
-// Step 11: Health check endpoint
-// Frontend can call GET /api/health to check if backend is alive
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     message: 'Server is running',
-    timestamp: new Date().toISOString(), // Current time
-    uptime: process.uptime() // How long server has been running (in seconds)
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
-// Step 12: Catch-all for unmatched routes
-// If someone tries to access a route that doesn't exist, send 404 error
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+const friendsRouter = require('./routes/friends');
+friendsRouter.setIO(io);
+app.use('/api/friends', friendsRouter);
+app.use('/api/messages', require('./routes/messages'));
+
+// 404 handler
 app.use((req, res) => {
-  console.log('[404] Unmatched route:', req.method, req.url);
   res.status(404).json({ 
     error: 'Not Found', 
     method: req.method, 
@@ -323,75 +173,35 @@ app.use((req, res) => {
   });
 });
 
-// Step 13: Get port number
-// Get from .env file, or use 5000 as default
+// Start server
 const PORT = process.env.PORT || 5000;
 
-console.log(`🚀 Starting server on port ${PORT}...`);
-
-// Step 14: Start the server
-// This is like opening the restaurant for business
-try {
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`✅ Health check available at http://0.0.0.0:${PORT}/`);
-    console.log(`✅ Server is ready to accept requests`);
-    console.log(`✅ Railway can now check health - server is listening`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  
+  // Connect to MongoDB
+  if (mongoose.connection.readyState === 0) {
+    const databaseUrl = process.env.MONGODB_URI || 'mongodb://localhost:27017/chefgpt-chat';
     
-    // Test that server is actually responding
-    setTimeout(() => {
-      console.log(`✅ Server confirmed listening on port ${PORT}`);
-    }, 100);
-    
-    // Step 15: Connect to MongoDB database
-    // MongoDB is where we store all our data (users, orders, menu items, etc.)
-    // We connect AFTER server starts so server can respond to health checks immediately
-    if (mongoose.connection.readyState === 0) {
-      // Get database URL from .env file, or use default local database
-      const databaseUrl = process.env.MONGODB_URI || 'mongodb://localhost:27017/amma-chethi-vanta';
-      
-      mongoose.connect(databaseUrl, {
-        useNewUrlParser: true, // Use new URL parser
-        useUnifiedTopology: true, // Use new connection management
-      })
-      .then(() => console.log('✅ MongoDB Connected'))
-      .catch(err => {
-        console.error('⚠️ MongoDB connection error:', err);
-        // Don't crash - server can run without DB for health checks
-      });
-    } else {
-      console.log('✅ MongoDB Already Connected');
-    }
-  });
-
-  // Handle server errors
-  server.on('error', (err) => {
-    console.error('❌ Server error:', err);
-    // Don't exit - try to recover
-  });
-} catch (error) {
-  console.error('❌ Failed to start server:', error);
-  process.exit(1); // Exit with error code
-}
-
-// Step 16: Keep server process alive
-// Prevent accidental exits
-process.on('beforeExit', (code) => {
-  console.log(`⚠️ Process about to exit with code ${code} - this should not happen`);
-  // Don't exit - keep server running
+    mongoose.connect(databaseUrl, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    })
+    .then(() => console.log('✅ MongoDB Connected'))
+    .catch(err => {
+      console.error('⚠️ MongoDB connection error:', err);
+    });
+  } else {
+    console.log('✅ MongoDB Already Connected');
+  }
 });
 
-// Keep the event loop alive (prevents server from shutting down)
-setInterval(() => {
-  // This keeps the process alive
-}, 10000);
-
-// Handle graceful shutdown (when server needs to stop)
+// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
   server.close(() => {
     console.log('Server closed');
-    process.exit(0); // Exit successfully
+    process.exit(0);
   });
 });
 
@@ -401,15 +211,4 @@ process.on('SIGINT', () => {
     console.log('Server closed');
     process.exit(0);
   });
-});
-
-// Prevent uncaught exceptions from crashing the server
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  // Don't exit - keep server running
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Don't exit - keep server running
 });

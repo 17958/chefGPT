@@ -159,21 +159,7 @@ router.post('/signup', async (req, res) => {
     });
     
     if (error.code === 11000) {
-      // Duplicate key error - check if it's email or phone field
-      const errorMessage = error.message || '';
-      const keyPattern = error.keyPattern || {};
-      
-      // Check if it's the phone field causing the issue
-      if (errorMessage.includes('phone') || keyPattern.phone) {
-        console.error('❌ Phone index error detected. Please run: npm run fix-phone-index');
-        return res.status(500).json({ 
-          message: 'Database configuration error. Please contact support or run the phone index fix script.',
-          error: process.env.NODE_ENV === 'development' ? 'Phone index duplicate key error. Run: npm run fix-phone-index' : undefined
-        });
-      }
-      
-      // Otherwise, it's likely an email duplicate (though we check this before saving)
-      // Double-check by querying the database
+      // Duplicate key error - likely email duplicate
       const checkUser = await User.findOne({ email: cleanEmail });
       if (checkUser) {
         return res.status(409).json({ 
@@ -182,8 +168,8 @@ router.post('/signup', async (req, res) => {
         });
       }
       
-      // If user doesn't exist but we got duplicate key, it's likely phone index issue
-      console.error('❌ Duplicate key error but user not found. Likely phone index issue.');
+      // If user doesn't exist but we got duplicate key, it's a database issue
+      console.error('❌ Duplicate key error but user not found.');
       return res.status(500).json({ 
         message: 'Registration failed due to database issue. Please contact support.',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined

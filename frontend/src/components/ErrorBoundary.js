@@ -65,7 +65,7 @@ class ErrorBoundary extends React.Component {
           <button
             onClick={() => {
               this.setState({ hasError: false, error: null });
-              window.location.href = '/signin';
+              window.location.href = '/auth';
             }}
             style={{
               padding: '10px 20px',

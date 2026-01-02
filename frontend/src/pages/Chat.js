@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import io from 'socket.io-client';
+import { Send, UserPlus, LogOut, MessageCircle } from 'lucide-react';
 import './Chat.css';
 
-// Prevent duplicate message handling
 const messageCache = new Set();
 
 const Chat = () => {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const [friends, setFriends] = useState([]);
   const [selectedFriend, setSelectedFriend] = useState(null);
@@ -19,7 +20,7 @@ const Chat = () => {
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [socket, setSocket] = useState(null);
-  const [socketStatus, setSocketStatus] = useState('disconnected'); // 'connected', 'disconnected', 'connecting'
+  const [socketStatus, setSocketStatus] = useState('disconnected');
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [showBroSuggestions, setShowBroSuggestions] = useState(false);
@@ -31,7 +32,6 @@ const Chat = () => {
   const suggestionsRef = useRef(null);
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-  // @bro suggestion prompts
   const broSuggestions = [
     { text: 'bro', label: '🤖 @bro', description: 'AI Assistant - Ask anything' },
     { text: 'bro what can you help me with?', label: 'What can you help with?', description: 'Discover @bro capabilities' },
@@ -41,21 +41,17 @@ const Chat = () => {
     { text: 'bro explain something', label: 'Explain something', description: 'Learn something new' }
   ];
 
-  // Persist selected friend to localStorage
   const STORAGE_KEY = 'chat_selected_friend';
   
-  // Cleanup message cache on unmount
   useEffect(() => {
     return () => {
       messageCache.clear();
     };
   }, []);
 
-  // Function to format AI response with markdown support
   const formatAIMessage = (text) => {
     if (!text || typeof text !== 'string') return text;
     
-    // Remove redundant "🤖 @bro:" prefix if present
     let cleanedText = text.trim();
     if (cleanedText.startsWith('🤖 @bro:')) {
       cleanedText = cleanedText.substring(8).trim();
@@ -66,20 +62,17 @@ const Chat = () => {
     const elements = [];
     let currentIndex = 0;
     
-    // Pattern to match code blocks: ```language\ncode\n```
     const codeBlockPattern = /```(\w+)?\n([\s\S]*?)```/g;
     let codeMatch;
     let lastIndex = 0;
     
     while ((codeMatch = codeBlockPattern.exec(cleanedText)) !== null) {
-      // Add text before code block
       if (codeMatch.index > lastIndex) {
         const beforeText = cleanedText.substring(lastIndex, codeMatch.index);
         elements.push(...formatTextWithBro(beforeText, currentIndex));
         currentIndex += beforeText.length;
       }
       
-      // Add code block
       const language = codeMatch[1] || 'text';
       const code = codeMatch[2].trim();
       elements.push(
@@ -116,13 +109,11 @@ const Chat = () => {
       currentIndex = lastIndex;
     }
     
-    // Add remaining text after last code block
     if (lastIndex < cleanedText.length) {
       const remainingText = cleanedText.substring(lastIndex);
       elements.push(...formatTextWithBro(remainingText, currentIndex));
     }
     
-    // If no code blocks found, just format the text
     if (elements.length === 0) {
       return formatTextWithBro(cleanedText, 0);
     }
@@ -130,14 +121,12 @@ const Chat = () => {
     return elements;
   };
   
-  // Helper function to format text with @bro highlighting and line breaks
   const formatTextWithBro = (text, startIndex) => {
     if (!text) return [];
     
     const elements = [];
     let elementIndex = startIndex;
     
-    // Split by line breaks first
     const lines = text.split('\n');
     
     lines.forEach((line, lineIndex) => {
@@ -146,21 +135,18 @@ const Chat = () => {
         elementIndex++;
       }
       
-      // Check for inline code: `code`
       const inlineCodePattern = /`([^`]+)`/g;
       let codeMatch;
       let lastIndex = 0;
       const lineElements = [];
       
       while ((codeMatch = inlineCodePattern.exec(line)) !== null) {
-        // Add text before inline code
         if (codeMatch.index > lastIndex) {
           const beforeText = line.substring(lastIndex, codeMatch.index);
           lineElements.push(...highlightBroInText(beforeText, elementIndex));
           elementIndex += beforeText.length;
         }
         
-        // Add inline code
         lineElements.push(
           <code key={`inline-code-${elementIndex}`} className="ai-inline-code">
             {codeMatch[1]}
@@ -170,14 +156,12 @@ const Chat = () => {
         lastIndex = codeMatch.index + codeMatch[0].length;
       }
       
-      // Add remaining text after inline code
       if (lastIndex < line.length) {
         const remainingText = line.substring(lastIndex);
         lineElements.push(...highlightBroInText(remainingText, elementIndex));
         elementIndex += remainingText.length;
       }
       
-      // If no inline code, just highlight @bro
       if (lineElements.length === 0) {
         lineElements.push(...highlightBroInText(line, elementIndex));
         elementIndex += line.length;
@@ -189,7 +173,6 @@ const Chat = () => {
     return elements;
   };
   
-  // Helper function to highlight @bro in text
   const highlightBroInText = (text, startIndex) => {
     if (!text) return [];
     
@@ -205,8 +188,7 @@ const Chat = () => {
       return <span key={`text-${startIndex}-${index}`}>{part}</span>;
     });
   };
-  
-  // Function to highlight @bro in regular messages (non-AI)
+
   const highlightBro = (text) => {
     if (!text || typeof text !== 'string') return text;
     return highlightBroInText(text, 0);
@@ -214,10 +196,12 @@ const Chat = () => {
 
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
-      // Use requestAnimationFrame for smoother scrolling
-      requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      });
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end'
+        });
+      }, 100);
     }
   }, []);
 
@@ -228,7 +212,6 @@ const Chat = () => {
       const friendsList = response.data.friends || [];
       setFriends(friendsList);
       
-      // Restore selected friend from localStorage
       const savedFriendId = localStorage.getItem(STORAGE_KEY);
       if (savedFriendId && friendsList.length > 0) {
         const savedFriend = friendsList.find(
@@ -254,7 +237,6 @@ const Chat = () => {
       setLoadingMessages(true);
       const response = await axios.get(`${API_URL}/api/messages/${friendId}`);
       setMessages(response.data.messages || []);
-      // Small delay to ensure DOM is updated
       setTimeout(() => {
         scrollToBottom();
       }, 100);
@@ -268,17 +250,14 @@ const Chat = () => {
     }
   }, [API_URL, scrollToBottom, navigate]);
 
-  // Initialize Socket.io connection with reconnection handling
   useEffect(() => {
     if (!user || !token) return;
 
-    // Clean up existing socket
     if (socketRef.current) {
       socketRef.current.disconnect();
       socketRef.current = null;
     }
 
-    // Clear any pending reconnection
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
@@ -303,7 +282,6 @@ const Chat = () => {
       setSocketStatus('connected');
       newSocket.emit('join', user.id);
       
-      // If we have a selected friend, refetch messages to ensure sync
       if (selectedFriend) {
         const friendId = selectedFriend._id || selectedFriend.id;
         if (friendId) {
@@ -316,9 +294,7 @@ const Chat = () => {
       console.log('Disconnected from chat server:', reason);
       setSocketStatus('disconnected');
       
-      // Auto-reconnect if not a manual disconnect
       if (reason === 'io server disconnect') {
-        // Server disconnected us, try to reconnect
         reconnectTimeoutRef.current = setTimeout(() => {
           if (socketRef.current && !socketRef.current.connected) {
             socketRef.current.connect();
@@ -343,31 +319,26 @@ const Chat = () => {
     });
 
     newSocket.on('newMessage', (message) => {
-      // Only add message if it's for the current conversation
       const currentFriendId = selectedFriend?._id || selectedFriend?.id;
       const messageSenderId = message.sender?._id || message.sender;
       const messageReceiverId = message.receiver?._id || message.receiver;
       
-      // Create unique key for message
       const messageKey = `${message._id || message.content}-${new Date(message.createdAt).getTime()}`;
       
       if (currentFriendId && 
           (messageSenderId === currentFriendId || messageReceiverId === currentFriendId ||
            messageSenderId === user.id || messageReceiverId === user.id)) {
-        // Check cache to avoid duplicates
         if (messageCache.has(messageKey)) {
           return;
         }
         messageCache.add(messageKey);
         
-        // Clean cache if it gets too large (keep last 1000)
         if (messageCache.size > 1000) {
           const firstKey = messageCache.values().next().value;
           messageCache.delete(firstKey);
         }
         
         setMessages(prev => {
-          // Double check for duplicates in state
           const exists = prev.some(m => 
             m._id === message._id || 
             (m.content === message.content && 
@@ -381,17 +352,14 @@ const Chat = () => {
     });
 
     newSocket.on('messageSent', (message) => {
-      // Create unique key for message
       const messageKey = `${message._id || message.content}-${new Date(message.createdAt).getTime()}`;
       
-      // Check cache to avoid duplicates
       if (messageCache.has(messageKey)) {
         return;
       }
       messageCache.add(messageKey);
       
       setMessages(prev => {
-        // Double check for duplicates in state
         const exists = prev.some(m => 
           m._id === message._id || 
           (m.content === message.content && 
@@ -419,22 +387,18 @@ const Chat = () => {
       }
       setSocketStatus('disconnected');
     };
-  }, [user, token, API_URL, selectedFriend, fetchMessages]);
+  }, [user, token, API_URL, selectedFriend, fetchMessages, scrollToBottom]);
 
-  // Fetch friends list on mount and when user changes
   useEffect(() => {
     if (user) {
       fetchFriends();
     }
   }, [user, fetchFriends]);
 
-  // Handle window focus - refetch data if needed
   useEffect(() => {
     const handleFocus = () => {
       if (user && socketStatus === 'connected') {
-        // Refetch friends to get latest status
         fetchFriends();
-        // Refetch messages if friend is selected
         if (selectedFriend) {
           const friendId = selectedFriend._id || selectedFriend.id;
           if (friendId) {
@@ -448,26 +412,29 @@ const Chat = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, [user, socketStatus, selectedFriend, fetchFriends, fetchMessages]);
 
-  // Fetch messages when friend is selected
   useEffect(() => {
     if (selectedFriend && user) {
       const friendId = selectedFriend._id || selectedFriend.id;
       if (friendId) {
-        // Save to localStorage
         localStorage.setItem(STORAGE_KEY, friendId);
         fetchMessages(friendId);
       }
     } else {
-      // Clear selection from localStorage
       localStorage.removeItem(STORAGE_KEY);
     }
   }, [selectedFriend, user, fetchMessages]);
+
+  // Smooth scroll when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages.length, scrollToBottom]);
 
   const handleAddFriend = async (e) => {
     e.preventDefault();
     if (!friendEmail.trim() || isAddingFriend) return;
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(friendEmail.trim())) {
       alert('Please enter a valid email address');
@@ -480,20 +447,17 @@ const Chat = () => {
         email: friendEmail.trim() 
       });
       
-      // Show success message
       alert(response.data.message || 'Friend added successfully!');
       setFriendEmail('');
       setShowAddFriend(false);
       await fetchFriends();
       
-      // Optionally select the newly added friend
       if (response.data.friend) {
         setSelectedFriend(response.data.friend);
       }
     } catch (error) {
       console.error('Add friend error:', error);
       
-      // Show specific error message
       const errorMessage = error.response?.data?.message || 
                           error.message || 
                           'Failed to add friend. Please check the email and try again.';
@@ -522,11 +486,9 @@ const Chat = () => {
       content: newMessage.trim()
     };
 
-    // Close suggestions
     setShowBroSuggestions(false);
     setSelectedSuggestionIndex(-1);
 
-    // Optimistically add message to UI
     const tempMessage = {
       _id: `temp-${Date.now()}`,
       sender: { _id: user.id },
@@ -542,62 +504,98 @@ const Chat = () => {
 
     socket.emit('sendMessage', messageData);
     
-    // Remove optimistic message after a delay (will be replaced by real message)
     setTimeout(() => {
       setMessages(prev => prev.filter(m => !m.isOptimistic));
     }, 1000);
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/signin');
+  };
+
   return (
     <div className="chat-container">
-      <div className="chat-sidebar">
+      <motion.div 
+        className="chat-sidebar"
+        initial={{ x: -350, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ 
+          type: "spring", 
+          stiffness: 300, 
+          damping: 30,
+          mass: 0.8
+        }}
+      >
         <div className="chat-header">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <h2 style={{ margin: 0 }}>💬 Chat</h2>
+            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MessageCircle size={24} />
+              Chat
+            </h2>
             <div className={`socket-status ${socketStatus}`} title={`Socket: ${socketStatus}`}></div>
           </div>
-          <button 
+          <motion.button 
             className="add-friend-btn"
             onClick={() => setShowAddFriend(!showAddFriend)}
+            whileHover={{ scale: 1.02, y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
           >
-            + Add Friend
-          </button>
+            <UserPlus size={16} style={{ marginRight: '8px', display: 'inline-block' }} />
+            Add Friend
+          </motion.button>
         </div>
 
-        {showAddFriend && (
-          <form onSubmit={handleAddFriend} className="add-friend-form">
-            <input
-              type="email"
-              placeholder="Enter friend's email"
-              value={friendEmail}
-              onChange={(e) => setFriendEmail(e.target.value)}
-              disabled={isAddingFriend}
-              required
-            />
-            <div className="add-friend-buttons">
-              <button 
-                type="submit" 
+        <AnimatePresence>
+          {showAddFriend && (
+            <motion.form
+              onSubmit={handleAddFriend}
+              className="add-friend-form"
+              initial={{ height: 0, opacity: 0, y: -10 }}
+              animate={{ height: 'auto', opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: -10 }}
+              transition={{ 
+                duration: 0.25,
+                ease: [0.4, 0, 0.2, 1]
+              }}
+            >
+              <input
+                type="email"
+                placeholder="Enter friend's email"
+                value={friendEmail}
+                onChange={(e) => setFriendEmail(e.target.value)}
                 disabled={isAddingFriend}
-                className={isAddingFriend ? 'loading' : ''}
-              >
-                {isAddingFriend ? 'Adding...' : 'Add'}
-              </button>
-              <button 
-                type="button" 
-                onClick={() => {
-                  setShowAddFriend(false);
-                  setFriendEmail('');
-                }}
-                disabled={isAddingFriend}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
+                required
+              />
+              <div className="add-friend-buttons">
+                <motion.button 
+                  type="submit" 
+                  disabled={isAddingFriend}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isAddingFriend ? 'Adding...' : 'Add'}
+                </motion.button>
+                <motion.button 
+                  type="button" 
+                  onClick={() => {
+                    setShowAddFriend(false);
+                    setFriendEmail('');
+                  }}
+                  disabled={isAddingFriend}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Cancel
+                </motion.button>
+              </div>
+            </motion.form>
+          )}
+        </AnimatePresence>
 
         <div className="friends-list">
-          {loadingFriends ? (
+              {loadingFriends ? (
             <div className="chat-loading">
               <div className="chat-loading-spinner"></div>
               Loading friends...
@@ -607,11 +605,21 @@ const Chat = () => {
               <p>No friends yet. Add a friend by email to start chatting!</p>
             </div>
           ) : (
-            friends.map((friend) => (
-              <div
+            friends.map((friend, index) => (
+              <motion.div
                 key={friend._id || friend.id}
                 className={`friend-item ${selectedFriend?._id === friend._id || selectedFriend?.id === friend.id ? 'active' : ''}`}
                 onClick={() => setSelectedFriend(friend)}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ 
+                  delay: index * 0.03,
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 25
+                }}
+                whileHover={{ x: 4 }}
+                whileTap={{ scale: 0.98 }}
               >
                 <div className="friend-avatar">
                   {friend.name?.charAt(0).toUpperCase() || 'F'}
@@ -620,22 +628,36 @@ const Chat = () => {
                   <div className="friend-name">{friend.name}</div>
                   <div className="friend-email">{friend.email}</div>
                 </div>
-              </div>
+              </motion.div>
             ))
           )}
         </div>
 
         <div className="chat-footer-sidebar">
-          <button 
-            className="back-to-menu-btn"
-            onClick={() => navigate('/menu')}
+          <motion.button 
+            className="logout-btn"
+            onClick={handleLogout}
+            whileHover={{ scale: 1.02, y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
           >
-            ← Back to Menu
-          </button>
+            <LogOut size={16} style={{ marginRight: '8px', display: 'inline-block' }} />
+            Logout
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="chat-main">
+      <motion.div 
+        className="chat-main"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ 
+          type: "spring",
+          stiffness: 300,
+          damping: 30,
+          delay: 0.1
+        }}
+      >
         {selectedFriend ? (
           <>
             <div className="chat-header-main">
@@ -664,35 +686,51 @@ const Chat = () => {
                 </div>
               ) : (
                 <>
-                  {messages.map((message, index) => {
-                    const isOwn = (message.sender?._id || message.sender) === user.id;
-                    const isAI = message.isAIResponse;
-                    const messageContent = message.content || '';
-                    
-                    return (
-                      <div
-                        key={message._id || `msg-${index}`}
-                        className={`message ${isOwn ? 'own' : 'other'} ${isAI ? 'ai' : ''}`}
-                      >
-                        {!isOwn && (
-                          <div className="message-avatar">
-                            {isAI ? '🤖' : (selectedFriend.name?.charAt(0).toUpperCase() || 'F')}
+                  <AnimatePresence>
+                    {messages.map((message, index) => {
+                      const isOwn = (message.sender?._id || message.sender) === user.id;
+                      const isAI = message.isAIResponse;
+                      const messageContent = message.content || '';
+                      
+                      return (
+                        <motion.div
+                          key={message._id || `msg-${index}`}
+                          className={`message ${isOwn ? 'own' : 'other'} ${isAI ? 'ai' : ''}`}
+                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ 
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 25,
+                            mass: 0.8
+                          }}
+                          layout
+                        >
+                          {!isOwn && (
+                            <div className="message-avatar">
+                              {isAI ? '🤖' : (selectedFriend.name?.charAt(0).toUpperCase() || 'F')}
+                            </div>
+                          )}
+                          <div className="message-content">
+                            <div className={`message-text ${isAI ? 'ai-message-text' : ''}`}>
+                              {isAI ? formatAIMessage(messageContent) : highlightBro(messageContent)}
+                            </div>
+                            <div className="message-time">
+                              {message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              }) : 'Just now'}
+                              {isOwn && (
+                                <span className="message-status">
+                                  {message.read ? '✓✓' : '✓'}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        )}
-                        <div className="message-content">
-                          <div className={`message-text ${isAI ? 'ai-message-text' : ''}`}>
-                            {isAI ? formatAIMessage(messageContent) : highlightBro(messageContent)}
-                          </div>
-                          <div className="message-time">
-                            {message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : 'Just now'}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
                   <div ref={messagesEndRef} />
                 </>
               )}
@@ -709,11 +747,9 @@ const Chat = () => {
                     const value = e.target.value;
                     setNewMessage(value);
                     
-                    // Show suggestions when typing @
                     const lastAt = value.lastIndexOf('@');
                     if (lastAt !== -1) {
                       const afterAt = value.substring(lastAt + 1).trim();
-                      // Show suggestions if @ is at the end or followed by space/start of word
                       if (afterAt === '' || afterAt.startsWith(' ') || /^[a-zA-Z]*$/.test(afterAt)) {
                         setShowBroSuggestions(true);
                         setSelectedSuggestionIndex(-1);
@@ -727,7 +763,6 @@ const Chat = () => {
                   className="message-input"
                   disabled={socketStatus !== 'connected' || loadingMessages}
                   onKeyDown={(e) => {
-                    // Handle suggestions navigation
                     if (showBroSuggestions && broSuggestions.length > 0) {
                       if (e.key === 'ArrowDown') {
                         e.preventDefault();
@@ -740,12 +775,10 @@ const Chat = () => {
                       } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
                         e.preventDefault();
                         const suggestion = broSuggestions[selectedSuggestionIndex];
-                        // Find the last @ and replace the word after it with the suggestion
                         const lastAt = newMessage.lastIndexOf('@');
                         if (lastAt !== -1) {
                           const beforeAt = newMessage.substring(0, lastAt + 1);
                           const afterAt = newMessage.substring(lastAt + 1);
-                          // Find where the current word ends (space or end of string)
                           const wordEndMatch = afterAt.match(/^([a-zA-Z]*)(\s|$)/);
                           const restOfText = wordEndMatch ? afterAt.substring(wordEndMatch[1].length) : '';
                           setNewMessage(beforeAt + suggestion.text + restOfText);
@@ -772,7 +805,6 @@ const Chat = () => {
                     }
                   }}
                   onBlur={(e) => {
-                    // Delay hiding suggestions to allow click
                     setTimeout(() => {
                       const activeElement = document.activeElement;
                       if (!suggestionsRef.current?.contains(activeElement) && activeElement !== inputRef.current) {
@@ -782,7 +814,6 @@ const Chat = () => {
                     }, 200);
                   }}
                   onClick={() => {
-                    // Show suggestions if input contains @
                     if (newMessage.includes('@')) {
                       const lastAt = newMessage.lastIndexOf('@');
                       if (lastAt !== -1) {
@@ -795,27 +826,33 @@ const Chat = () => {
                   }}
                   autoFocus
                 />
-                {showBroSuggestions && (
-                  <div 
-                    ref={suggestionsRef}
-                    className="bro-suggestions"
-                    onMouseDown={(e) => e.preventDefault()} // Prevent input blur
-                  >
-                    <div className="bro-suggestions-header">
-                      <span className="bro-badge">🤖 @bro</span>
-                      <span className="bro-suggestions-title">AI Assistant Suggestions</span>
-                    </div>
-                    {broSuggestions.map((suggestion, index) => (
-                      <div
+                <AnimatePresence>
+                  {showBroSuggestions && (
+                    <motion.div 
+                      ref={suggestionsRef}
+                      className="bro-suggestions"
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      transition={{ 
+                        duration: 0.2,
+                        ease: [0.4, 0, 0.2, 1]
+                      }}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <div className="bro-suggestions-header">
+                        <span className="bro-badge">🤖 @bro</span>
+                        <span className="bro-suggestions-title">AI Assistant Suggestions</span>
+                      </div>
+                      {broSuggestions.map((suggestion, index) => (
+                      <motion.div
                         key={index}
                         className={`bro-suggestion-item ${selectedSuggestionIndex === index ? 'selected' : ''}`}
                         onClick={() => {
-                          // Find the last @ and replace the word after it with the suggestion
                           const lastAt = newMessage.lastIndexOf('@');
                           if (lastAt !== -1) {
                             const beforeAt = newMessage.substring(0, lastAt + 1);
                             const afterAt = newMessage.substring(lastAt + 1);
-                            // Find where the current word ends (space or end of string)
                             const wordEndMatch = afterAt.match(/^([a-zA-Z]*)(\s|$)/);
                             const restOfText = wordEndMatch ? afterAt.substring(wordEndMatch[1].length) : '';
                             setNewMessage(beforeAt + suggestion.text + restOfText);
@@ -827,39 +864,68 @@ const Chat = () => {
                           inputRef.current?.focus();
                         }}
                         onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        whileHover={{ x: 4 }}
+                        whileTap={{ scale: 0.98 }}
                       >
-                        <div className="suggestion-label">{suggestion.label}</div>
-                        <div className="suggestion-description">{suggestion.description}</div>
+                          <div className="suggestion-label">{suggestion.label}</div>
+                          <div className="suggestion-description">{suggestion.description}</div>
+                        </motion.div>
+                      ))}
+                      <div className="bro-suggestions-footer">
+                        <span>💡 Type your question after @bro</span>
                       </div>
-                    ))}
-                    <div className="bro-suggestions-footer">
-                      <span>💡 Type your question after @bro</span>
-                    </div>
-                  </div>
-                )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-              <button 
+              <motion.button 
                 type="submit" 
                 className="send-button"
                 disabled={!newMessage.trim() || socketStatus !== 'connected' || loadingMessages}
                 title={socketStatus !== 'connected' ? 'Waiting for connection...' : 'Send message (Enter)'}
+                whileHover={{ 
+                  scale: socketStatus === 'connected' && newMessage.trim() ? 1.08 : 1,
+                  rotate: socketStatus === 'connected' && newMessage.trim() ? 5 : 0
+                }}
+                whileTap={{ scale: 0.92 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
-                {socketStatus === 'connected' ? 'Send' : '...'}
-              </button>
+                <Send size={18} />
+              </motion.button>
             </form>
           </>
         ) : (
-          <div className="no-chat-selected">
-            <div className="no-chat-icon">💬</div>
+          <motion.div 
+            className="no-chat-selected"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <motion.div 
+              className="no-chat-icon"
+              animate={{ 
+                y: [0, -8, 0],
+                scale: [1, 1.05, 1]
+              }}
+              transition={{ 
+                duration: 3, 
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            >
+              💬
+            </motion.div>
             <h3>Select a friend to start chatting</h3>
             <p>Or add a new friend to begin a conversation</p>
             <p className="ai-hint">💡 Tip: Type @ in your messages to get AI assistance suggestions!</p>
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 };
 
 export default Chat;
-
