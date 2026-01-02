@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import io from 'socket.io-client';
 import FriendNotification from './FriendNotification';
 import axios from 'axios';
 
 const NotificationManager = () => {
   const { user, token } = useAuth();
+  const { error: showError, success, info } = useToast();
   const navigate = useNavigate();
   const [notification, setNotification] = useState(null);
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -75,9 +77,10 @@ const NotificationManager = () => {
     try {
       await axios.post(`${API_URL}/api/friends/accept/${notification.request.id}`);
       setNotification(null);
+      success('Friend request accepted!');
       window.location.reload();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to accept friend request');
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to accept friend request');
     }
   };
 
@@ -87,8 +90,9 @@ const NotificationManager = () => {
     try {
       await axios.post(`${API_URL}/api/friends/reject/${notification.request.id}`);
       setNotification(null);
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to reject friend request');
+      info('Friend request rejected');
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to reject friend request');
     }
   };
 

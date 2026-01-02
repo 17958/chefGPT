@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import io from 'socket.io-client';
-import { Send, UserPlus, LogOut, MessageCircle } from 'lucide-react';
+import { Send, UserPlus, LogOut, MessageCircle, Bot, Lightbulb, DoorOpen } from 'lucide-react';
 import './Chat.css';
 
 const messageCache = new Set();
 
 const Chat = () => {
   const { user, token, logout } = useAuth();
+  const { success, error, warning } = useToast();
   const navigate = useNavigate();
   const [friends, setFriends] = useState([]);
   const [selectedFriend, setSelectedFriend] = useState(null);
@@ -23,17 +25,21 @@ const Chat = () => {
   const [socketStatus, setSocketStatus] = useState('disconnected');
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(true);
+  const [loadingAI, setLoadingAI] = useState(false);
   const [showBroSuggestions, setShowBroSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const inputRef = useRef(null);
   const suggestionsRef = useRef(null);
+  const fetchingMessagesRef = useRef(false);
+  const lastFetchedFriendIdRef = useRef(null);
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   const broSuggestions = [
-    { text: 'bro', label: '🤖 @bro', description: 'AI Assistant - Ask anything' },
+    { text: 'bro', label: '@bro', description: 'AI Assistant - Ask anything' },
     { text: 'bro what can you help me with?', label: 'What can you help with?', description: 'Discover @bro capabilities' },
     { text: 'bro give me cooking tips', label: 'Cooking tips', description: 'Get culinary advice' },
     { text: 'bro tell me a joke', label: 'Tell me a joke', description: 'Have some fun' },
@@ -49,12 +55,13 @@ const Chat = () => {
     };
   }, []);
 
+
   const formatAIMessage = (text) => {
     if (!text || typeof text !== 'string') return text;
     
     let cleanedText = text.trim();
-    if (cleanedText.startsWith('🤖 @bro:')) {
-      cleanedText = cleanedText.substring(8).trim();
+    if (cleanedText.startsWith('🤖 @bro:') || cleanedText.startsWith('@bro:')) {
+      cleanedText = cleanedText.replace(/^🤖\s*@bro:\s*/, '').replace(/^@bro:\s*/, '').trim();
     } else if (cleanedText.startsWith('@bro:')) {
       cleanedText = cleanedText.substring(5).trim();
     }
@@ -92,8 +99,9 @@ const Chat = () => {
                     btn.textContent = originalText;
                     btn.style.background = '';
                   }, 2000);
+                  success('Code copied to clipboard!');
                 }).catch(() => {
-                  alert('Failed to copy code');
+                  error('Failed to copy code');
                 });
               }}
               title="Copy code"
@@ -127,50 +135,100 @@ const Chat = () => {
     const elements = [];
     let elementIndex = startIndex;
     
+    // Split by lines but preserve empty lines
     const lines = text.split('\n');
     
     lines.forEach((line, lineIndex) => {
+      // Add line break before each line except the first
       if (lineIndex > 0) {
         elements.push(<br key={`br-${elementIndex}`} />);
         elementIndex++;
       }
       
-      const inlineCodePattern = /`([^`]+)`/g;
-      let codeMatch;
-      let lastIndex = 0;
-      const lineElements = [];
+      // Handle empty lines
+      if (line.trim() === '') {
+        elements.push(<span key={`empty-${elementIndex}`} className="ai-empty-line">&nbsp;</span>);
+        elementIndex++;
+        return;
+      }
       
-      while ((codeMatch = inlineCodePattern.exec(line)) !== null) {
-        if (codeMatch.index > lastIndex) {
-          const beforeText = line.substring(lastIndex, codeMatch.index);
-          lineElements.push(...highlightBroInText(beforeText, elementIndex));
-          elementIndex += beforeText.length;
-        }
+      // Check for list items (numbered or bulleted)
+      const listPattern = /^(\d+\.|[-*+])\s+(.+)$/;
+      const listMatch = line.match(listPattern);
+      
+      if (listMatch) {
+        const listContent = listMatch[2];
+        const listMarker = listMatch[1];
+        const isNumbered = /^\d+\.$/.test(listMarker);
         
-        lineElements.push(
-          <code key={`inline-code-${elementIndex}`} className="ai-inline-code">
-            {codeMatch[1]}
-          </code>
+        elements.push(
+          <div key={`list-${elementIndex}`} className={`ai-list-item ${isNumbered ? 'numbered' : 'bulleted'}`}>
+            <span className="ai-list-marker">{listMarker}</span>
+            <span className="ai-list-content">
+              {formatInlineContent(listContent, elementIndex + 1)}
+            </span>
+          </div>
         );
-        elementIndex += codeMatch[0].length;
-        lastIndex = codeMatch.index + codeMatch[0].length;
-      }
-      
-      if (lastIndex < line.length) {
-        const remainingText = line.substring(lastIndex);
-        lineElements.push(...highlightBroInText(remainingText, elementIndex));
-        elementIndex += remainingText.length;
-      }
-      
-      if (lineElements.length === 0) {
-        lineElements.push(...highlightBroInText(line, elementIndex));
         elementIndex += line.length;
+        return;
       }
       
-      elements.push(...lineElements);
+      // Format regular line with inline code and @bro highlighting
+      elements.push(...formatInlineContent(line, elementIndex));
+      elementIndex += line.length;
     });
     
     return elements;
+  };
+  
+  const formatInlineContent = (text, startIndex) => {
+    if (!text) return [];
+    
+    const elements = [];
+    let elementIndex = startIndex;
+    
+    // Pattern to match inline code and @bro mentions
+    const pattern = /(`[^`]+`|@bro)/gi;
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = pattern.exec(text)) !== null) {
+      // Add text before match
+      if (match.index > lastIndex) {
+        const beforeText = text.substring(lastIndex, match.index);
+        elements.push(...highlightBroInText(beforeText, elementIndex));
+        elementIndex += beforeText.length;
+      }
+      
+      // Handle match
+      if (match[0].startsWith('`')) {
+        // Inline code
+        const code = match[0].slice(1, -1); // Remove backticks
+        elements.push(
+          <code key={`inline-code-${elementIndex}`} className="ai-inline-code">
+            {code}
+          </code>
+        );
+      } else {
+        // @bro mention
+        elements.push(
+          <span key={`bro-${elementIndex}`} className="bro-highlight">
+            @bro
+          </span>
+        );
+      }
+      
+      elementIndex += match[0].length;
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      const remainingText = text.substring(lastIndex);
+      elements.push(...highlightBroInText(remainingText, elementIndex));
+    }
+    
+    return elements.length > 0 ? elements : [<span key={`text-${startIndex}`}>{text}</span>];
   };
   
   const highlightBroInText = (text, startIndex) => {
@@ -206,25 +264,46 @@ const Chat = () => {
   }, []);
 
   const fetchFriends = useCallback(async () => {
+    // Default Raja friend
+    const defaultRajaFriend = {
+      _id: 'raja-default',
+      id: 'raja-default',
+      name: 'Raja',
+      email: 'raja@chat.com',
+      isDefault: true
+    };
+
     try {
       setLoadingFriends(true);
       const response = await axios.get(`${API_URL}/api/friends`);
       const friendsList = response.data.friends || [];
-      setFriends(friendsList);
+      
+      // Add Raja as default friend at the beginning
+      const allFriends = [defaultRajaFriend, ...friendsList];
+      setFriends(allFriends);
       
       const savedFriendId = localStorage.getItem(STORAGE_KEY);
-      if (savedFriendId && friendsList.length > 0) {
-        const savedFriend = friendsList.find(
+      if (savedFriendId && allFriends.length > 0) {
+        const savedFriend = allFriends.find(
           f => (f._id || f.id) === savedFriendId
         );
         if (savedFriend) {
           setSelectedFriend(savedFriend);
+        } else {
+          // If saved friend not found, default to Raja
+          setSelectedFriend(defaultRajaFriend);
         }
+      } else {
+        // No saved friend, default to Raja
+        setSelectedFriend(defaultRajaFriend);
       }
     } catch (error) {
       console.error('Error fetching friends:', error);
+      // Even on error, show Raja as default
+      setFriends([defaultRajaFriend]);
+      setSelectedFriend(defaultRajaFriend);
       if (error.response?.status === 401) {
-        navigate('/signin');
+        navigate('/auth');
       }
     } finally {
       setLoadingFriends(false);
@@ -233,6 +312,38 @@ const Chat = () => {
 
   const fetchMessages = useCallback(async (friendId) => {
     if (!friendId) return;
+    
+    // Prevent duplicate fetches for the same friend
+    if (fetchingMessagesRef.current && lastFetchedFriendIdRef.current === friendId) {
+      return;
+    }
+    
+    fetchingMessagesRef.current = true;
+    lastFetchedFriendIdRef.current = friendId;
+    
+    // For Raja, fetch messages from special endpoint or use empty array
+    if (friendId === 'raja-default') {
+      try {
+        setLoadingMessages(true);
+        // Try to fetch Raja messages - backend will handle the special ID
+        const response = await axios.get(`${API_URL}/api/messages/raja-default`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMessages(response.data.messages || []);
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
+      } catch (error) {
+        // If endpoint doesn't exist yet, start with empty messages
+        console.log('Raja messages endpoint not available yet, starting fresh');
+        setMessages([]);
+      } finally {
+        setLoadingMessages(false);
+        fetchingMessagesRef.current = false;
+      }
+      return;
+    }
+    
     try {
       setLoadingMessages(true);
       const response = await axios.get(`${API_URL}/api/messages/${friendId}`);
@@ -243,12 +354,13 @@ const Chat = () => {
     } catch (error) {
       console.error('Error fetching messages:', error);
       if (error.response?.status === 401) {
-        navigate('/signin');
+        navigate('/auth');
       }
     } finally {
       setLoadingMessages(false);
+      fetchingMessagesRef.current = false;
     }
-  }, [API_URL, scrollToBottom, navigate]);
+  }, [API_URL, scrollToBottom, navigate, token]);
 
   useEffect(() => {
     if (!user || !token) return;
@@ -282,12 +394,8 @@ const Chat = () => {
       setSocketStatus('connected');
       newSocket.emit('join', user.id);
       
-      if (selectedFriend) {
-        const friendId = selectedFriend._id || selectedFriend.id;
-        if (friendId) {
-          fetchMessages(friendId);
-        }
-      }
+      // Don't fetch messages here - let the selectedFriend useEffect handle it
+      // This prevents duplicate fetches
     });
 
     newSocket.on('disconnect', (reason) => {
@@ -417,10 +525,14 @@ const Chat = () => {
       const friendId = selectedFriend._id || selectedFriend.id;
       if (friendId) {
         localStorage.setItem(STORAGE_KEY, friendId);
-        fetchMessages(friendId);
+        // Only fetch if this is a different friend than last time
+        if (lastFetchedFriendIdRef.current !== friendId) {
+          fetchMessages(friendId);
+        }
       }
     } else {
       localStorage.removeItem(STORAGE_KEY);
+      lastFetchedFriendIdRef.current = null;
     }
   }, [selectedFriend, user, fetchMessages]);
 
@@ -437,7 +549,7 @@ const Chat = () => {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(friendEmail.trim())) {
-      alert('Please enter a valid email address');
+      error('Please enter a valid email address');
       return;
     }
 
@@ -447,7 +559,7 @@ const Chat = () => {
         email: friendEmail.trim() 
       });
       
-      alert(response.data.message || 'Friend added successfully!');
+      success(response.data.message || 'Friend added successfully!');
       setFriendEmail('');
       setShowAddFriend(false);
       await fetchFriends();
@@ -455,28 +567,112 @@ const Chat = () => {
       if (response.data.friend) {
         setSelectedFriend(response.data.friend);
       }
-    } catch (error) {
-      console.error('Add friend error:', error);
+    } catch (err) {
+      console.error('Add friend error:', err);
       
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      const errorMessage = err.response?.data?.message || 
+                          err.message || 
                           'Failed to add friend. Please check the email and try again.';
-      alert(errorMessage);
+      error(errorMessage);
       
-      if (error.response?.status === 401) {
-        navigate('/signin');
+      if (err.response?.status === 401) {
+        navigate('/auth');
       }
     } finally {
       setIsAddingFriend(false);
     }
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedFriend) return;
     
+    // For default Raja, use AI to respond
+    if (selectedFriend.isDefault) {
+      const userMessage = {
+        _id: `user-${Date.now()}`,
+        sender: { _id: user.id, name: user.name },
+        receiver: { _id: 'raja-default', name: 'Raja' },
+        content: newMessage.trim(),
+        createdAt: new Date().toISOString(),
+        isOptimistic: false
+      };
+      
+      const messageToSend = newMessage.trim();
+      setNewMessage('');
+      
+      // Prepare chat history BEFORE adding the new message
+      // Include the current message we're about to add
+      const chatHistory = [...messages, userMessage].slice(-10).map(msg => ({
+        sender: msg.sender,
+        content: msg.content,
+        isAIResponse: msg.isAIResponse
+      }));
+      
+      // Add user message to state
+      setMessages(prev => [...prev, userMessage]);
+      setTimeout(() => scrollToBottom(), 50);
+      
+      // Add loading indicator
+      setLoadingAI(true);
+      const loadingMessage = {
+        _id: `loading-${Date.now()}`,
+        sender: { _id: 'raja-default', name: 'Raja' },
+        receiver: { _id: user.id },
+        content: '...',
+        createdAt: new Date().toISOString(),
+        isAIResponse: true,
+        isLoading: true
+      };
+      setMessages(prev => [...prev, loadingMessage]);
+      setTimeout(() => scrollToBottom(), 50);
+      
+      // Get AI response from backend
+      try {
+        const response = await axios.post(`${API_URL}/api/messages/ai`, {
+          prompt: messageToSend,
+          chatHistory: chatHistory
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Remove loading message
+        setMessages(prev => prev.filter(m => !m.isLoading));
+        
+        const rajaResponse = {
+          _id: response.data.aiMessageId || `raja-${Date.now()}`,
+          sender: { _id: 'raja-default', name: 'Raja' },
+          receiver: { _id: user.id },
+          content: response.data.response || "I'm here to help! What would you like to know?",
+          createdAt: new Date().toISOString(),
+          isAIResponse: true
+        };
+        setMessages(prev => [...prev, rajaResponse]);
+        setTimeout(() => scrollToBottom(), 50);
+      } catch (error) {
+        console.error('Error getting AI response:', error);
+        // Remove loading message
+        setMessages(prev => prev.filter(m => !m.isLoading));
+        
+        const rajaResponse = {
+          _id: `raja-${Date.now()}`,
+          sender: { _id: 'raja-default', name: 'Raja' },
+          receiver: { _id: user.id },
+          content: "I'm having trouble right now, but I'm here to help! Please try again.",
+          createdAt: new Date().toISOString(),
+          isAIResponse: true
+        };
+        setMessages(prev => [...prev, rajaResponse]);
+        setTimeout(() => scrollToBottom(), 50);
+      } finally {
+        setLoadingAI(false);
+      }
+      
+      return;
+    }
+    
     if (!socket || socketStatus !== 'connected') {
-      alert('Not connected to chat server. Please wait for connection...');
+      warning('Not connected to chat server. Please wait for connection...');
       return;
     }
 
@@ -510,8 +706,17 @@ const Chat = () => {
   };
 
   const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
     logout();
-    navigate('/signin');
+    navigate('/auth');
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutConfirm(false);
   };
 
   return (
@@ -552,9 +757,9 @@ const Chat = () => {
             <motion.form
               onSubmit={handleAddFriend}
               className="add-friend-form"
-              initial={{ height: 0, opacity: 0, y: -10 }}
-              animate={{ height: 'auto', opacity: 1, y: 0 }}
-              exit={{ height: 0, opacity: 0, y: -10 }}
+              initial={{ maxHeight: 0, opacity: 0, paddingTop: 0, paddingBottom: 0 }}
+              animate={{ maxHeight: 300, opacity: 1, paddingTop: 16, paddingBottom: 16 }}
+              exit={{ maxHeight: 0, opacity: 0, paddingTop: 0, paddingBottom: 0 }}
               transition={{ 
                 duration: 0.25,
                 ease: [0.4, 0, 0.2, 1]
@@ -680,7 +885,9 @@ const Chat = () => {
                 </div>
               ) : messages.length === 0 ? (
                 <div className="no-chat-selected" style={{ padding: '40px 20px' }}>
-                  <div className="no-chat-icon">💬</div>
+                  <div className="no-chat-icon">
+                    <MessageCircle size={48} />
+                  </div>
                   <h3>No messages yet</h3>
                   <p>Start the conversation!</p>
                 </div>
@@ -708,24 +915,38 @@ const Chat = () => {
                         >
                           {!isOwn && (
                             <div className="message-avatar">
-                              {isAI ? '🤖' : (selectedFriend.name?.charAt(0).toUpperCase() || 'F')}
+                              {isAI ? (
+                                <Bot size={18} className="ai-avatar-icon" />
+                              ) : (
+                                selectedFriend.name?.charAt(0).toUpperCase() || 'F'
+                              )}
                             </div>
                           )}
                           <div className="message-content">
-                            <div className={`message-text ${isAI ? 'ai-message-text' : ''}`}>
-                              {isAI ? formatAIMessage(messageContent) : highlightBro(messageContent)}
-                            </div>
-                            <div className="message-time">
-                              {message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : 'Just now'}
-                              {isOwn && (
-                                <span className="message-status">
-                                  {message.read ? '✓✓' : '✓'}
-                                </span>
-                              )}
-                            </div>
+                            {message.isLoading ? (
+                              <div className="ai-loading-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                              </div>
+                            ) : (
+                              <>
+                                <div className={`message-text ${isAI ? 'ai-message-text' : ''}`}>
+                                  {isAI ? formatAIMessage(messageContent) : highlightBro(messageContent)}
+                                </div>
+                                <div className="message-time">
+                                  {message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }) : 'Just now'}
+                                  {isOwn && (
+                                    <span className="message-status">
+                                      {message.read ? '✓✓' : '✓'}
+                                    </span>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </motion.div>
                       );
@@ -741,11 +962,19 @@ const Chat = () => {
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder={socketStatus === 'connected' ? "Type a message... (Type @ for AI help)" : "Connecting..."}
+                  placeholder={selectedFriend?.isDefault 
+                    ? "Type a message to Raja..." 
+                    : (socketStatus === 'connected' ? "Type a message... (Type @ for AI help)" : "Connecting...")}
                   value={newMessage}
                   onChange={(e) => {
                     const value = e.target.value;
                     setNewMessage(value);
+                    
+                    // Don't show @bro suggestions when chatting with Raja
+                    if (selectedFriend?.isDefault) {
+                      setShowBroSuggestions(false);
+                      return;
+                    }
                     
                     const lastAt = value.lastIndexOf('@');
                     if (lastAt !== -1) {
@@ -761,7 +990,7 @@ const Chat = () => {
                     }
                   }}
                   className="message-input"
-                  disabled={socketStatus !== 'connected' || loadingMessages}
+                  disabled={(!selectedFriend?.isDefault && socketStatus !== 'connected') || loadingMessages}
                   onKeyDown={(e) => {
                     if (showBroSuggestions && broSuggestions.length > 0) {
                       if (e.key === 'ArrowDown') {
@@ -793,14 +1022,18 @@ const Chat = () => {
                         setSelectedSuggestionIndex(-1);
                       } else if (e.key === 'Enter' && !e.shiftKey && !showBroSuggestions) {
                         e.preventDefault();
-                        if (newMessage.trim() && socketStatus === 'connected') {
-                          handleSendMessage(e);
+                        if (newMessage.trim()) {
+                          if (selectedFriend?.isDefault || socketStatus === 'connected') {
+                            handleSendMessage(e);
+                          }
                         }
                       }
                     } else if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      if (newMessage.trim() && socketStatus === 'connected') {
-                        handleSendMessage(e);
+                      if (newMessage.trim()) {
+                        if (selectedFriend?.isDefault || socketStatus === 'connected') {
+                          handleSendMessage(e);
+                        }
                       }
                     }
                   }}
@@ -814,6 +1047,12 @@ const Chat = () => {
                     }, 200);
                   }}
                   onClick={() => {
+                    // Don't show @bro suggestions when chatting with Raja
+                    if (selectedFriend?.isDefault) {
+                      setShowBroSuggestions(false);
+                      return;
+                    }
+                    
                     if (newMessage.includes('@')) {
                       const lastAt = newMessage.lastIndexOf('@');
                       if (lastAt !== -1) {
@@ -841,7 +1080,10 @@ const Chat = () => {
                       onMouseDown={(e) => e.preventDefault()}
                     >
                       <div className="bro-suggestions-header">
-                        <span className="bro-badge">🤖 @bro</span>
+                        <span className="bro-badge">
+                          <Bot size={16} style={{ marginRight: '6px', display: 'inline-block', verticalAlign: 'middle' }} />
+                          @bro
+                        </span>
                         <span className="bro-suggestions-title">AI Assistant Suggestions</span>
                       </div>
                       {broSuggestions.map((suggestion, index) => (
@@ -875,7 +1117,10 @@ const Chat = () => {
                         </motion.div>
                       ))}
                       <div className="bro-suggestions-footer">
-                        <span>💡 Type your question after @bro</span>
+                        <span>
+                          <Lightbulb size={14} style={{ marginRight: '6px', display: 'inline-block', verticalAlign: 'middle' }} />
+                          Type your question after @bro
+                        </span>
                       </div>
                     </motion.div>
                   )}
@@ -884,8 +1129,8 @@ const Chat = () => {
               <motion.button 
                 type="submit" 
                 className="send-button"
-                disabled={!newMessage.trim() || socketStatus !== 'connected' || loadingMessages}
-                title={socketStatus !== 'connected' ? 'Waiting for connection...' : 'Send message (Enter)'}
+                disabled={!newMessage.trim() || (socketStatus !== 'connected' && !selectedFriend?.isDefault) || loadingMessages || loadingAI}
+                title={loadingAI ? 'Raja is thinking...' : (socketStatus !== 'connected' && !selectedFriend?.isDefault) ? 'Waiting for connection...' : 'Send message (Enter)'}
                 whileHover={{ 
                   scale: socketStatus === 'connected' && newMessage.trim() ? 1.08 : 1,
                   rotate: socketStatus === 'connected' && newMessage.trim() ? 5 : 0
@@ -916,7 +1161,7 @@ const Chat = () => {
                 ease: "easeInOut"
               }}
             >
-              💬
+              <MessageCircle size={64} />
             </motion.div>
             <h3>Select a friend to start chatting</h3>
             <p>Or add a new friend to begin a conversation</p>
@@ -924,6 +1169,56 @@ const Chat = () => {
           </motion.div>
         )}
       </motion.div>
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <motion.div
+            className="logout-modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={cancelLogout}
+          >
+            <motion.div
+              className="logout-modal"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="logout-modal-icon">
+                <DoorOpen size={48} />
+              </div>
+              <h3 className="logout-modal-title">Logout?</h3>
+              <p className="logout-modal-message">
+                Are you sure you want to logout? You'll need to sign in again to continue.
+              </p>
+              <div className="logout-modal-buttons">
+                <motion.button
+                  className="logout-modal-cancel"
+                  onClick={cancelLogout}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  className="logout-modal-confirm"
+                  onClick={confirmLogout}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                >
+                  Logout
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

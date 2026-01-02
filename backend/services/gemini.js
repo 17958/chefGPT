@@ -36,9 +36,11 @@ async function listAvailableModels() {
 /**
  * Get AI response using Gemini
  * @param {string} prompt - User's message
+ * @param {string} context - Context for the AI (e.g., 'raja' or '@bro')
+ * @param {Array} chatHistory - Previous messages for context (optional)
  * @returns {Promise<string>} - AI response
  */
-async function getAIResponse(prompt) {
+async function getAIResponse(prompt, context = '@bro', chatHistory = []) {
   try {
     // Check if API key exists
     const apiKey = process.env.GEMINI_API_KEY;
@@ -53,44 +55,33 @@ async function getAIResponse(prompt) {
       return "Hey! Your GEMINI_API_KEY appears to be invalid. Please check your API key format. Get a new key at https://makersuite.google.com/app/apikey";
     }
 
-    console.log('✅ GEMINI_API_KEY found, attempting to use Gemini models...');
+    console.log('✅ GEMINI_API_KEY found, using fastest model...');
 
-    // First, try to get available models
-    console.log('📋 Checking available models...');
-    const availableModels = await listAvailableModels();
-    
-    // Build model list - prefer available models, then fallback to common names
-    let modelNames = [];
-    
-    if (availableModels.length > 0) {
-      console.log(`✅ Found ${availableModels.length} available models:`, availableModels);
-      // Prefer newer models first
-      modelNames = availableModels.sort((a, b) => {
-        // Prioritize 2.5, then 2.0, then others
-        if (a.includes('2.5') && !b.includes('2.5')) return -1;
-        if (!a.includes('2.5') && b.includes('2.5')) return 1;
-        if (a.includes('2.0') && !b.includes('2.0')) return -1;
-        if (!a.includes('2.0') && b.includes('2.0')) return 1;
-        // Prefer flash over pro (faster)
-        if (a.includes('flash') && !b.includes('flash')) return -1;
-        if (!a.includes('flash') && b.includes('flash')) return 1;
-        return 0;
-      });
-    } else {
-      console.log('⚠️ Could not list models, using common model names...');
-      // Try newer model names first, then fallback
-      modelNames = [
-        'gemini-2.5-flash',     // Latest and fastest
-        'gemini-2.0-flash',     // Fast
-        'gemini-2.5-pro',       // Latest and capable
-        'gemini-2.0-flash-001', // Specific version
-        'gemini-1.5-flash',     // Older but stable
-        'gemini-1.5-pro',       // Older but capable
-        'gemini-pro'            // Legacy fallback
-      ];
-    }
+    // Skip model listing for speed - use fastest models directly
+    // Try fastest models first for better response time
+    const modelNames = [
+      'gemini-1.5-flash',     // Fastest and most reliable
+      'gemini-2.0-flash',     // Fast
+      'gemini-2.5-flash',     // Latest and fast
+      'gemini-1.5-pro',       // Slower but capable fallback
+      'gemini-pro'            // Legacy fallback
+    ];
 
     let lastError = null;
+    const identity = context === 'raja' ? 'Raja' : '@bro';
+    
+    // Build chat history context if available
+    let historyContext = '';
+    if (chatHistory && chatHistory.length > 0) {
+      // Take last 10 messages for context (to avoid token limits)
+      const recentHistory = chatHistory.slice(-10);
+      historyContext = '\n\nPrevious conversation:\n';
+      recentHistory.forEach(msg => {
+        const role = msg.sender?.name === identity || msg.isAIResponse ? 'Assistant' : 'User';
+        const content = msg.content || '';
+        historyContext += `${role}: ${content}\n`;
+      });
+    }
     
     // Try SDK first, then REST API as fallback
     for (const modelName of modelNames) {
@@ -98,11 +89,15 @@ async function getAIResponse(prompt) {
         console.log(`🔄 Attempting to use model: ${modelName} (SDK)`);
         const model = genAI.getGenerativeModel({ model: modelName });
         
-        const chatPrompt = `You are @bro, a friendly and helpful AI assistant. 
-        Keep responses concise, friendly, and helpful. 
-        User message: ${prompt}
+        const chatPrompt = `You are ${identity}, a helpful and intelligent AI assistant. 
+        Respond naturally, professionally, and conversationally. 
+        Keep responses concise and relevant. 
+        Do not use overly casual terms like "Buddy", "Pal", or "Dude". 
+        Address the user naturally by their name if mentioned, or use a neutral, friendly tone.${historyContext}
         
-        Respond naturally and conversationally:`;
+        Current user message: ${prompt}
+        
+        Provide a helpful and natural response based on the conversation context:`;
 
         const result = await model.generateContent(chatPrompt);
         const response = await result.response;
@@ -122,7 +117,7 @@ async function getAIResponse(prompt) {
             {
               contents: [{
                 parts: [{
-                  text: `You are @bro, a friendly and helpful AI assistant. Keep responses concise, friendly, and helpful. User message: ${prompt}. Respond naturally and conversationally:`
+                  text: `You are ${identity}, a helpful and intelligent AI assistant. Respond naturally, professionally, and conversationally. Keep responses concise and relevant. Do not use overly casual terms like "Buddy", "Pal", or "Dude". Address the user naturally by their name if mentioned, or use a neutral, friendly tone.${historyContext} Current user message: ${prompt}. Provide a helpful and natural response based on the conversation context:`
                 }]
               }]
             },

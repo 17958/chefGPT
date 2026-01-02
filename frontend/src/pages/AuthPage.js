@@ -1,35 +1,35 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { motion } from 'framer-motion';
 import { Mail, Lock, MessageCircle } from 'lucide-react';
 import './AuthPage.css';
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const { error: showError, success } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     
     if (!email.trim()) {
-      setError('Please enter your email');
+      showError('Please enter your email');
       return;
     }
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      setError('Please enter a valid email address');
+      showError('Please enter a valid email address');
       return;
     }
 
     if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters');
+      showError('Password must be at least 6 characters');
       return;
     }
     
@@ -40,6 +40,7 @@ const AuthPage = () => {
       const loginResult = await login(email.trim(), password);
       
       if (loginResult.success) {
+        success('Welcome back!');
         navigate('/chat');
         return;
       }
@@ -48,12 +49,13 @@ const AuthPage = () => {
       const signupResult = await register(email.trim(), password);
       
       if (signupResult.success) {
+        success('Account created successfully!');
         navigate('/chat');
       } else {
-        setError(signupResult.message || 'Authentication failed. Please try again.');
+        showError(signupResult.message || 'Authentication failed. Please try again.');
       }
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      showError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -98,16 +100,6 @@ const AuthPage = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
         >
-          {error && (
-            <motion.div
-              className="error-message"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-            >
-              {error}
-            </motion.div>
-          )}
 
           <motion.div
             className="input-group"
@@ -174,7 +166,7 @@ const AuthPage = () => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.7, duration: 0.5 }}
           >
-            Don't have an account? Just enter your details and we'll create one for you!
+            ✨ New here? No worries! We'll set you up in seconds
           </motion.p>
         </motion.form>
       </motion.div>

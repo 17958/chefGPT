@@ -123,13 +123,8 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (email, password) => {
     try {
-      // Check if already logged in
-      if (token && user) {
-        return {
-          success: false,
-          message: 'You are already signed in. Please logout first.'
-        };
-      }
+      // Don't check for existing login - allow registration even if logged in
+      // This allows users to create new accounts without logging out first
 
       // Validate before sending
       if (!email || !email.trim()) {
